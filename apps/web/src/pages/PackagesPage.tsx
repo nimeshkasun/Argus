@@ -1,4 +1,4 @@
-import { type Ecosystem, type PackageUsageDto, type Paged } from '@argus/shared';
+import { ECOSYSTEM_LABELS, ECOSYSTEMS, type Ecosystem, type PackageUsageDto, type Paged } from '@argus/shared';
 import { useQuery } from '@tanstack/react-query';
 import { PackageSearch } from 'lucide-react';
 import { type FormEvent, useState } from 'react';
@@ -28,13 +28,16 @@ export function PackagesPage() {
       <PageHeader title="Package search" description="Find every repository that uses a package — for example to answer “are we affected?” when a new vulnerability is announced." />
       <Card className="mb-6 p-5">
         <form onSubmit={submit} className="grid items-end gap-4 sm:grid-cols-[2fr_1fr_1fr_auto]">
-          <Field label="Package name">{(id) => <Input id={id} placeholder="e.g. lodash or Newtonsoft.Json" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />}</Field>
+          <Field label="Package name">{(id) => <Input id={id} placeholder="e.g. lodash, requests or org.apache.logging.log4j:log4j-core" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />}</Field>
           <Field label="Ecosystem">
             {(id) => (
               <Select id={id} value={form.ecosystem} onChange={(e) => setForm({ ...form, ecosystem: e.target.value as Ecosystem | '' })}>
                 <option value="">Any</option>
-                <option value="npm">npm</option>
-                <option value="nuget">NuGet</option>
+                {ECOSYSTEMS.map((e) => (
+                  <option key={e} value={e}>
+                    {ECOSYSTEM_LABELS[e]}
+                  </option>
+                ))}
               </Select>
             )}
           </Field>

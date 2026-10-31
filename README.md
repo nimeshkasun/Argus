@@ -5,7 +5,7 @@
 Argus connects to your GitHub and Bitbucket organisations and continuously watches the repositories you choose. It detects:
 
 - leaked secrets
-- vulnerable NuGet and npm packages
+- vulnerable packages (npm, NuGet, PyPI, Maven/Gradle, Go and Cargo)
 - outdated or end-of-life frameworks
 - expiring certificates and credentials
 

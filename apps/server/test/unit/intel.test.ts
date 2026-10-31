@@ -34,8 +34,8 @@ describe('news feed parsing', () => {
 
   it('turns HTML into plain text and validates advisory ranges', () => {
     expect(htmlToText('<style>p{}</style><p>a&nbsp;&amp;&#33;</p><ul><li>x</li><li>y</li></ul>')).toBe('a &!\nx\ny');
-    expect(isValidRange('<4.17.21')).toBe(true);
-    expect(isValidRange('>=2.0.0 <2.3.1 || >=3.0.0 <3.0.2')).toBe(true);
-    expect(isValidRange('not a range')).toBe(false);
+    expect(isValidRange('npm', '<4.17.21')).toBe(true);
+    expect(isValidRange('npm', '>=2.0.0 <2.3.1 || >=3.0.0 <3.0.2')).toBe(true);
+    expect(isValidRange('npm', 'not a range')).toBe(false);
   });
 });

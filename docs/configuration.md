@@ -38,6 +38,7 @@ Runtime policies (password rules, MFA, sessions) are set in the UI under **Admin
 | `ARGUS_EOL_URL` | `https://endoflife.date` | endoflife.date base URL. |
 | `ARGUS_NPM_REGISTRY_URL` | `https://registry.npmjs.org` | npm registry, or an internal proxy such as Artifactory or Azure Artifacts. |
 | `ARGUS_NUGET_URL` | `https://api.nuget.org/v3-flatcontainer` | NuGet flat-container endpoint. |
+| `ARGUS_DEPSDEV_URL` | `https://api.deps.dev` | [deps.dev](https://deps.dev) API, used for the latest version, deprecation and license of PyPI, Maven, Go and Cargo packages. |
 | `ARGUS_NVD_URL` | `https://services.nvd.nist.gov/rest/json/cves/2.0` | NVD CVE API 2.0, used for CVSS scores that OSV does not provide. |
 | `ARGUS_METRICS_TOKEN` | — | Enables Prometheus metrics at `/metrics`; scrapers send it as a bearer token. At least 16 characters. |
 | `ARGUS_NVD_API_KEY` | — | Optional [NVD API key](https://nvd.nist.gov/developers/request-an-api-key). Raises NVD's rate limit from 5 to 50 requests per 30 seconds, so more scores are filled in per scan. Treat it as a secret. |

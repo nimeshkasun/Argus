@@ -19,8 +19,34 @@ export type Severity = (typeof SEVERITIES)[number];
 export const FINDING_STATUSES = ['open', 'suppressed', 'fixed'] as const;
 export type FindingStatus = (typeof FINDING_STATUSES)[number];
 
-export const ECOSYSTEMS = ['npm', 'nuget'] as const;
+export const ECOSYSTEMS = ['npm', 'nuget', 'pypi', 'maven', 'go', 'cargo'] as const;
 export type Ecosystem = (typeof ECOSYSTEMS)[number];
+
+export const ECOSYSTEM_LABELS: Record<Ecosystem, string> = {
+  npm: 'npm',
+  nuget: 'NuGet',
+  pypi: 'PyPI',
+  maven: 'Maven',
+  go: 'Go',
+  cargo: 'Cargo',
+};
+
+/**
+ * Name used to compare packages: NuGet ids and Cargo crate names are case-insensitive, and PyPI names are
+ * normalised per PEP 503 ("Django_REST.framework" and "django-rest-framework" are the same project).
+ * Maven ("group:artifact"), Go module paths and npm names are compared as written.
+ */
+export function canonicalPackageName(ecosystem: Ecosystem, name: string): string {
+  switch (ecosystem) {
+    case 'nuget':
+    case 'cargo':
+      return name.toLowerCase();
+    case 'pypi':
+      return name.toLowerCase().replace(/[-_.]+/g, '-');
+    default:
+      return name;
+  }
+}
 
 /** Score (0-100) to severity band. */
 export function severityForScore(score: number): Severity {

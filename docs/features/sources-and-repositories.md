@@ -108,6 +108,10 @@ A scan does the following:
 2. It records the commit, the number of files, the size, and the detected ecosystems and manifests:
    - npm: `package.json` and lockfiles
    - NuGet: `*.csproj`, `packages.config`, `Directory.Packages.props`, `packages.lock.json`
+   - PyPI: `pyproject.toml`, `poetry.lock`, `uv.lock`, `Pipfile`, `Pipfile.lock`, `requirements*.txt`
+   - Maven/Gradle: `pom.xml`, `build.gradle(.kts)`, `gradle.lockfile`, `*.versions.toml`
+   - Go: `go.mod`
+   - Cargo: `Cargo.toml`, `Cargo.lock`
    - .NET SDK (`global.json`) and Node version files
    - Dockerfiles
    - certificate files
@@ -155,6 +159,7 @@ For vulnerability and lifecycle data it also needs:
 - `endoflife.date`
 - `registry.npmjs.org`
 - `api.nuget.org`
+- `api.deps.dev`
 
 You can point these at mirrors, or turn them off with `ARGUS_OFFLINE=true`. See [data sources](scanners-and-findings.md#data-sources-caching-and-offline-mode).
 

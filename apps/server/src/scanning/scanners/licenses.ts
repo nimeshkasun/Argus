@@ -71,6 +71,6 @@ export class LicensesScanner implements Scanner {
         risk: { base: verdict === 'deny' ? 50 : 25, baseLabel: verdict === 'deny' ? 'Denied license' : 'License needs review', dev: dep.dev, transitive: !dep.direct },
       });
     }
-    return { status: 'ok', message: unknown ? `${unknown} package(s) without license data (license data is read from npm lockfiles)` : null, findings };
+    return { status: 'ok', message: unknown ? `${unknown} package(s) without license data (license data comes from npm lockfiles and package registries)` : null, findings };
   }
 }

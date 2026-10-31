@@ -3,7 +3,7 @@
 Argus keeps its vulnerability knowledge current between scans. It does this in three ways:
 
 - **Continuous re-matching.** Argus re-checks every repository's stored dependency inventory against newly published advisories, without cloning anything. When something new matches, findings and tickets open straight away and an *emerging threat* notification is sent.
-- **Security news.** Argus reads RSS and Atom feeds. If AI assistance is on, AI proposes npm and NuGet advisories from new items, and a person reviews them.
+- **Security news.** Argus reads RSS and Atom feeds. If AI assistance is on, AI proposes package advisories (npm, NuGet, PyPI, Maven, Go, Cargo) from new items, and a person reviews them.
 - **Argus advisories.** Advisories approved from news, or entered by hand, are matched by every scan and by re-matching, exactly like public advisories.
 
 Open **Threat intel** in the navigation. Everyone who can see findings can see the overview, the news, and Argus advisories. Security Managers and Administrators (`intel:manage`) can review items, manage advisories and sources, and trigger a re-check.
@@ -12,7 +12,7 @@ Open **Threat intel** in the navigation. Everyone who can see findings can see t
 
 | Source | What it provides |
 |---|---|
-| OSV.dev | npm and NuGet advisories, including the whole GitHub Advisory Database. This is the primary source. |
+| OSV.dev | npm, NuGet, PyPI, Maven, Go and crates.io advisories, including the whole GitHub Advisory Database. This is the primary source. |
 | CISA KEV | Whether a CVE is known to be exploited. |
 | FIRST EPSS | How likely a CVE is to be exploited. |
 | NVD (CVE API 2.0) | CVSS scores for CVEs whose OSV record has none, which is common for very fresh CVEs. A score from NVD is shown as `CVSS 9.8 (NVD)`. |
@@ -64,7 +64,7 @@ Each item is stored once per source. Fetching the same item again does nothing.
 
 ## AI extraction and review
 
-When the **Advisory extraction** feature is enabled under [AI assistance](ai-assistance.md), each new item is sent to the AI model. The model receives only the item's title, link, date and text; nothing from your repositories. It answers whether the item announces a vulnerability in an npm or NuGet package, and if so, proposes advisories. Each proposal has:
+When the **Advisory extraction** feature is enabled under [AI assistance](ai-assistance.md), each new item is sent to the AI model. The model receives only the item's title, link, date and text; nothing from your repositories. It answers whether the item announces a vulnerability in a package from a supported ecosystem, and if so, proposes advisories. Each proposal has:
 - the package and the affected version range
 - the fixed version
 - the severity and CVE ids
@@ -80,7 +80,7 @@ Items then show one of these statuses:
 | Status | Meaning |
 |---|---|
 | Not analysed | New, or AI extraction is off. You can still **Create advisory from this item** by hand, or click **Analyse with AI**. |
-| No npm/NuGet impact | The model found nothing to act on, with its reasoning shown. |
+| No package impact | The model found nothing to act on, with its reasoning shown. |
 | Awaiting review | Proposals are waiting. Edit them if needed, then **Approve** or **Reject**. |
 | Approved | Advisories were created, and repositories are being re-checked. |
 | Rejected | Dismissed. |
@@ -101,7 +101,7 @@ Affected ranges use npm syntax:
 - `>=2.0.0 <2.3.1`
 - `>=1.0.0 <1.0.5 || >=2.0.0 <2.0.2`
 
-NuGet versions are compared the same way.
+Versions are compared by each ecosystem's own rules. For npm, NuGet, Go and Cargo any npm range works (including `^` and `~`). For PyPI and Maven, use comparators (`<`, `<=`, `>`, `>=`, `=`) separated by spaces or commas, and `||` between alternatives, for example `>=2.0-beta9 <2.15.0` or `>=4.2, <4.2.16`. Maven package names are `groupId:artifactId`, and Go package names are module paths.
 
 ## Audit
 

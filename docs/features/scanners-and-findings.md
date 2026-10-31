@@ -7,15 +7,24 @@ Every scan runs five scanners over a fresh checkout of the repository. Each prob
 | Scanner | What it finds | How |
 |---|---|---|
 | **Leaked secrets** | Cloud keys (AWS, Azure, GCP), GitHub/GitLab/npm tokens, Slack, Stripe, SendGrid and similar keys, private keys, JWTs, passwords in connection strings, and high-entropy hard-coded secrets | [Gitleaks](https://github.com/gitleaks/gitleaks) (bundled in the Docker image, pinned version and checksum). If Gitleaks is not installed, Argus falls back to its own built-in high-signal rules. |
-| **Vulnerable & deprecated packages** | npm and NuGet packages with published vulnerabilities, and npm packages marked deprecated | Reads lockfiles and manifests (below), then queries [OSV.dev](https://osv.dev), which includes the GitHub Advisory Database. Vulnerabilities are enriched with CISA KEV and FIRST EPSS. The latest versions come from the npm and NuGet registries. |
+| **Vulnerable & deprecated packages** | npm, NuGet, PyPI, Maven, Go and Cargo packages with published vulnerabilities, and packages marked deprecated | Reads lockfiles and manifests (below), then queries [OSV.dev](https://osv.dev), which includes the GitHub Advisory Database. Vulnerabilities are enriched with CISA KEV and FIRST EPSS. The latest versions come from the npm and NuGet registries, and from [deps.dev](https://deps.dev) for the other ecosystems. |
 | **End-of-life frameworks & runtimes** | .NET, .NET Framework, Node.js, Angular, React, Vue, Next.js and NestJS versions that are out of support, or will be within the warning window | Version data from [endoflife.date](https://endoflife.date). Versions are read from target frameworks in `.csproj` files, `global.json`, `.nvmrc`, `engines.node`, `package.json` dependencies, and Dockerfile `FROM` lines. |
 | **Certificates & credential expiry** | Expired or soon-to-expire certificates, RSA keys under 2048 bits, committed `.pfx`/`.p12` key stores, and expiring JWTs in configuration files | Parses `.pem`, `.crt`, `.cer` and `.der` files. Reads JWT `exp` claims in JSON, YAML, `.env`, `.config` and similar files. |
-| **License policy** | Dependencies whose license is not allowed, or needs review, under your policy | SPDX expressions from npm lockfiles (`OR` means any acceptable option is enough; `AND` means every part must be acceptable). |
+| **License policy** | Dependencies whose license is not allowed, or needs review, under your policy | SPDX expressions from npm lockfiles, NuGet `.nuspec` files and deps.dev (`OR` means any acceptable option is enough; `AND` means every part must be acceptable). |
 
 **Supported manifests:**
 - **npm:** `package-lock.json` (v1–v3), `npm-shrinkwrap.json`, `yarn.lock` (classic and Berry), `pnpm-lock.yaml` (v5–v9).
   - `package.json` alone: the lowest version allowed by each range is used, and the finding is marked *unpinned*.
 - **NuGet:** `packages.lock.json`, `PackageReference` in SDK-style projects (including central package management via `Directory.Packages.props`), and `packages.config`.
+- **PyPI:** `poetry.lock`, `uv.lock` and `Pipfile.lock`, with direct and development dependencies taken from `pyproject.toml` or the `Pipfile`.
+  - Without a lock file: `requirements*.txt` (and `.txt` files in a `requirements/` folder), otherwise the dependencies declared in `pyproject.toml`. Only `==` pins are exact; a lower bound such as `>=2.31` is used as the version and marked *unpinned*.
+  - Requirement files named for development, tests, linting or docs (for example `requirements-dev.txt`) count as development dependencies.
+- **Maven and Gradle:** `pom.xml`, with versions resolved from properties and `dependencyManagement` in the same pom or a `pom.xml` in a parent folder; `gradle.lockfile` (the full resolved graph); literal `group:artifact:version` coordinates in `build.gradle(.kts)`; and Gradle version catalogs (`*.versions.toml`).
+  - A pom dependency whose version comes only from an external parent or BOM (for example `spring-boot-dependencies`) cannot be resolved without downloading it, so it is skipped. Use a Gradle lock file, or declare the version, for complete coverage.
+  - `test`-scoped dependencies count as development dependencies.
+- **Go:** `go.mod`, including indirect modules and `replace` directives. Modules replaced by a local folder are skipped.
+- **Cargo:** `Cargo.lock` (workspace members' `Cargo.toml` files name the direct and development dependencies), or `Cargo.toml` alone for a crate without a lock file.
+- Package names are compared the way each ecosystem does: NuGet ids and crate names ignore case, and PyPI names follow PEP 503 (`Django_Filter` and `django-filter` are the same project). Versions are ordered by each ecosystem's own rules, for example PEP 440 for PyPI and Maven's qualifier order (`alpha` < `beta` < `milestone` < `rc` < `snapshot` < release < `sp`).
 - `node_modules`, `bin`, `obj`, `dist` and similar folders are never scanned.
 
 ### Secrets: git history and live verification
@@ -152,18 +161,19 @@ Suppressions from `.argus.yml` are labelled as such on the finding. Administrato
 
 | Source | Used for | Sent from Argus |
 |---|---|---|
-| OSV.dev (`api.osv.dev`) | Vulnerabilities in npm and NuGet packages | Package names and versions |
+| OSV.dev (`api.osv.dev`) | Vulnerabilities in npm, NuGet, PyPI, Maven, Go and Cargo packages | Package names and versions |
 | CISA KEV (`www.cisa.gov`) | Known-exploited CVEs | Nothing (the whole catalogue is downloaded) |
 | FIRST EPSS (`api.first.org`) | Exploit probability | CVE ids |
 | NVD (`services.nvd.nist.gov`) | CVSS for CVEs whose OSV record has no score | CVE ids |
 | Argus advisories (your database) | Advisories approved from security news or entered by hand — see [Threat intelligence](threat-intelligence.md) | Nothing |
 | endoflife.date | Release cycles and end-of-life dates | Product names (e.g. `dotnet`) |
-| npm registry / NuGet API | Latest version, deprecation | Package names and versions (direct dependencies only) |
+| npm registry / NuGet API | Latest version, deprecation; NuGet licenses | Package names and versions (direct dependencies only, except NuGet licenses) |
+| deps.dev (`api.deps.dev`) | Latest version, deprecation and license of PyPI, Maven, Go and Cargo packages | Package names and versions |
 
 **No source code, file contents or secrets are ever sent to these services.** Responses are cached in the database; for example, advisories are kept for 24 hours and the KEV catalogue for 12 hours. Several workers share this cache. If a source is temporarily unreachable, Argus serves cached data for up to a week.
 
 **Mirrors and air-gapped networks:**
-- Every source URL is configurable (`ARGUS_OSV_URL`, `ARGUS_NPM_REGISTRY_URL`, …), so internal mirrors can be used.
+- Every source URL is configurable (`ARGUS_OSV_URL`, `ARGUS_NPM_REGISTRY_URL`, `ARGUS_DEPSDEV_URL`, …), so internal mirrors can be used.
 - `ARGUS_OFFLINE=true` turns off all outbound intel lookups. The secrets and certificates scanners still work fully. Dependency, framework and license results are then partial, and they never mark existing findings as fixed.
 
 **Administration → Scanning settings** (and the Threat intel overview) shows when each source was last used successfully and whether Gitleaks is installed.

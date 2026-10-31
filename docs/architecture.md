@@ -130,7 +130,7 @@ schedule / manual / push webhook
         ▼
  job queued in DB ──► worker leases job ──► shallow clone into /tmp/argus/<run>
                                                    │
-                         scanners (secrets, npm, NuGet, frameworks, certificates)
+                         scanners (secrets, packages, frameworks, certificates)
                                                    │
                        findings + dependency inventory (SBOM) stored ◄─┘
                                                    │
@@ -146,7 +146,7 @@ Background jobs, all through the job queue:
 | Job | Triggered by | Does |
 |---|---|---|
 | `intel.crawl` | scheduler, per due news source; **Fetch now** | Fetches an RSS/Atom feed and stores new items. |
-| `intel.extract` | new items, when AI extraction is on | Asks AI for npm/NuGet advisories, in batches of 10, into the review queue. |
+| `intel.extract` | new items, when AI extraction is on | Asks AI for package advisories, in batches of 10, into the review queue. |
 | `intel.rematch` | schedule (OSV refresh), **Re-check now**, new Argus advisories | Matches every stored inventory; opens findings, publishes `findings.changed` and `intel.emerging_threats`. |
 
 Scans and re-matching share one matcher (`scanning/vulnerability-matcher.ts`) and one finding builder (`scanning/observe.ts`), so the same vulnerability always gets the same fingerprint. See [Threat intelligence](features/threat-intelligence.md).

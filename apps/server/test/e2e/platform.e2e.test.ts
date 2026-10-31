@@ -278,7 +278,7 @@ describe.each(harnesses)('platform e2e: $name', (h) => {
       expect(createAdvisory['x-argus-permissions']).toEqual(['intel:manage']);
       const body = (createAdvisory.requestBody as { content: { 'application/json': { schema: { properties: Record<string, unknown>; required: string[] } } } }).content['application/json'].schema;
       expect(body.required).toEqual(expect.arrayContaining(['ecosystem', 'packageName', 'affectedRange']));
-      expect(body.properties.ecosystem).toMatchObject({ enum: ['npm', 'nuget'] });
+      expect(body.properties.ecosystem).toMatchObject({ enum: ['npm', 'nuget', 'pypi', 'maven', 'go', 'cargo'] });
       const listFindings = doc.paths['/api/v1/findings'].get;
       expect((listFindings.parameters as { name: string; in: string }[]).map((p) => p.name)).toEqual(expect.arrayContaining(['page', 'pageSize', 'repoId']));
       expect(doc.paths['/api/v1/tickets/{id}'].get.parameters).toEqual([expect.objectContaining({ name: 'id', in: 'path' })]);
