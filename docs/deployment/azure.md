@@ -48,7 +48,7 @@ The same result, step by step.
 
 ```bash
 az acr create -g argus-rg -n argusacr --sku Basic
-az acr build -r argusacr -t argus:0.1.1 -f deploy/docker/Dockerfile .
+az acr build -r argusacr -t argus:0.2.0 -f deploy/docker/Dockerfile .
 ```
 
 ## 2. Create the database
@@ -79,7 +79,7 @@ az keyvault secret set --vault-name argus-kv -n argus-db-url --value 'postgres:/
 ```bash
 az appservice plan create -g argus-rg -n argus-plan --is-linux --sku P1v3
 az webapp create -g argus-rg -p argus-plan -n argus-web \
-  --deployment-container-image-name argusacr.azurecr.io/argus:0.1.1
+  --deployment-container-image-name argusacr.azurecr.io/argus:0.2.0
 az webapp identity assign -g argus-rg -n argus-web
 # Let the app pull from ACR and read Key Vault with its managed identity
 # (grant AcrPull on the registry and "Key Vault Secrets User" on the vault).

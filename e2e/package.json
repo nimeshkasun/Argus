@@ -1,6 +1,6 @@
 {
   "name": "@argus/e2e",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "private": true,
   "description": "Browser tests: the built server and web app against a real database and a mock GitHub",
   "license": "Apache-2.0",
