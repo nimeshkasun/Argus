@@ -92,6 +92,9 @@ export const BASE_TEST_ENV = {
   LOG_LEVEL: 'silent',
   NODE_ENV: 'test',
   ARGUS_AUTH_RATE_LIMIT: '1000',
+  // External scanning tools are never used in tests, even if installed: their scanners report "skipped".
+  ARGUS_OPENGREP_PATH: 'argus-test-no-opengrep',
+  ARGUS_TRIVY_PATH: 'argus-test-no-trivy',
 };
 
 export async function waitFor<T>(fn: () => Promise<T | null | undefined | false>, opts: { timeoutMs?: number; intervalMs?: number; what?: string } = {}): Promise<T> {

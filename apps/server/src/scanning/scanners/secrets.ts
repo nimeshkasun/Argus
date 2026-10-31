@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { isTestPath } from '../risk';
 import { type SecretVerifier } from '../secret-verifier';
+import { toolVersion } from '../tools';
 import { type DraftFinding, type ScanInput, type Scanner, type ScannerOutput } from '../types';
 
 /** Upper bound on live verifications per scan. */
@@ -194,15 +195,8 @@ function* builtinMatches(text: string): Generator<{ rule: SecretRule; value: str
   }
 }
 
-let gitleaksProbe: Promise<string | null> | null = null;
-
 /** Gitleaks version, or null if the binary is not available. Probed once per process. */
-export function gitleaksVersion(binary: string): Promise<string | null> {
-  gitleaksProbe ??= execFileAsync(binary, ['version'], { timeout: 10_000, windowsHide: true })
-    .then(({ stdout }) => stdout.trim() || 'unknown')
-    .catch(() => null);
-  return gitleaksProbe;
-}
+export const gitleaksVersion = (binary: string) => toolVersion(binary, ['version']);
 
 export class SecretsScanner implements Scanner {
   readonly name = 'secrets' as const;

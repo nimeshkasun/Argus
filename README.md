@@ -6,6 +6,7 @@ Argus connects to your GitHub and Bitbucket organisations and continuously watch
 
 - leaked secrets
 - vulnerable packages (npm, NuGet, PyPI, Maven/Gradle, Go and Cargo)
+- weaknesses in source code, infrastructure-as-code misconfigurations and vulnerable container images
 - outdated or end-of-life frameworks
 - expiring certificates and credentials
 

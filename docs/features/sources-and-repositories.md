@@ -160,6 +160,7 @@ For vulnerability and lifecycle data it also needs:
 - `registry.npmjs.org`
 - `api.nuget.org`
 - `api.deps.dev`
+- `mirror.gcr.io` and `ghcr.io` (Trivy's checks, and its vulnerability database when container image scanning is on), plus the registries of scanned images
 
 You can point these at mirrors, or turn them off with `ARGUS_OFFLINE=true`. See [data sources](scanners-and-findings.md#data-sources-caching-and-offline-mode).
 

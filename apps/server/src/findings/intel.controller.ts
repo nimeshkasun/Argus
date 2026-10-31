@@ -4,6 +4,7 @@ import { RequirePermissions } from '../auth/decorators';
 import { AppConfig } from '../config/app-config';
 import { IntelService } from '../scanning/intel.service';
 import { gitleaksVersion } from '../scanning/scanners/secrets';
+import { opengrepVersion, trivyVersion } from '../scanning/tools';
 
 const FEEDS: [string, string][] = [
   ['osv', 'OSV.dev vulnerability database (includes GitHub Security Advisories)'],
@@ -24,13 +25,15 @@ export class IntelController {
   @RequirePermissions('settings:read')
   async status(): Promise<IntelStatusDto> {
     const status = await this.intel.feedStatus(FEEDS.map(([k]) => k));
-    const version = await gitleaksVersion(this.config.gitleaksPath);
+    const [version, opengrep, trivy] = await Promise.all([gitleaksVersion(this.config.gitleaksPath), opengrepVersion(this.config.opengrepPath), trivyVersion(this.config.trivyPath)]);
     return {
       feeds: FEEDS.map(([key, label]) => {
         const s = status.get(key);
         return { key, label, fetchedAt: s?.fetchedAt ?? null, entries: s?.entries ?? null, error: s?.error ?? null };
       }),
       gitleaks: { available: version !== null, version },
+      opengrep: { available: opengrep !== null, version: opengrep, rules: this.config.opengrepRules !== null },
+      trivy: { available: trivy !== null, version: trivy },
     };
   }
 }

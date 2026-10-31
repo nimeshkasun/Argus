@@ -58,8 +58,11 @@ export interface SharedScanState {
 }
 
 export interface ScannerOutput {
-  /** "partial" means some data could not be obtained (e.g. a feed was unreachable); unseen findings are then not marked fixed. */
-  status: 'ok' | 'partial';
+  /**
+   * "partial" means some data could not be obtained (e.g. a feed was unreachable); unseen findings are then not marked fixed.
+   * "skipped" means the scanner could not run at all (its tool is not installed, or it is turned off); nothing changes.
+   */
+  status: 'ok' | 'partial' | 'skipped';
   message: string | null;
   findings: DraftFinding[];
 }

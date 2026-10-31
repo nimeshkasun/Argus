@@ -44,6 +44,9 @@ See [Sources, repositories and scans](sources-and-repositories.md).
 | **PyPI, Maven/Gradle, Go and Cargo vulnerabilities, deprecations, latest versions and licenses** (`poetry.lock`, `uv.lock`, `Pipfile.lock`, `requirements.txt`, `pyproject.toml`, `pom.xml`, `gradle.lockfile`, `build.gradle`, version catalogs, `go.mod`, `Cargo.lock`, `Cargo.toml`) | ✅ |
 | **Framework / runtime end-of-life** (.NET, .NET Framework, Node.js, Angular, React, Vue, Next.js, NestJS) | ✅ |
 | **Certificate and credential expiry** (certificates, weak keys, key stores and expiring JWTs in repositories) | ✅ |
+| **Code weaknesses (static analysis)** with Opengrep and the community security rules (bundled), or your own rules | ✅ |
+| **Infrastructure-as-code misconfigurations** (Terraform, Kubernetes, Helm, Dockerfiles, CloudFormation, Azure ARM) with Trivy | ✅ |
+| **Container image vulnerabilities** for images referenced in Dockerfiles, Compose and Kubernetes manifests, with Trivy (opt-in) | ✅ |
 | License compliance policy (npm license data) | ✅ |
 | NuGet license data (from package .nuspec files) | ✅ |
 | CycloneDX SBOM per repository; organisation-wide package search | ✅ |

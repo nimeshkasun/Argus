@@ -26,5 +26,12 @@ export function groupKeyFor(f: GroupableFinding): string {
       return `frameworks|${String(f.details?.product ?? f.ruleId)}|${String(f.details?.cycle ?? f.path)}`;
     case 'certificates':
       return `certificates|${f.ruleId}|${String(f.details?.fingerprintSha256 ?? f.secret?.hash ?? f.path)}`;
+    // One ticket per rule per file: a weakness repeated in a file is fixed together.
+    case 'code':
+    case 'iac':
+      return `${f.scanner}|${f.ruleId}|${f.path}`;
+    // One ticket per image: its vulnerabilities are fixed together, by moving to a patched image.
+    case 'containers':
+      return `containers|${String(f.details?.image ?? f.path)}`;
   }
 }

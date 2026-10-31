@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { type FindingAiHintDto } from './ai';
 import { pageFields } from './schemas';
 
-export const SCANNERS = ['secrets', 'dependencies', 'frameworks', 'certificates', 'licenses'] as const;
+export const SCANNERS = ['secrets', 'dependencies', 'frameworks', 'certificates', 'licenses', 'code', 'iac', 'containers'] as const;
 export type ScannerName = (typeof SCANNERS)[number];
 
 export const SCANNER_LABELS: Record<ScannerName, string> = {
@@ -11,6 +11,9 @@ export const SCANNER_LABELS: Record<ScannerName, string> = {
   frameworks: 'End-of-life frameworks & runtimes',
   certificates: 'Certificates & credential expiry',
   licenses: 'License policy',
+  code: 'Code weaknesses (static analysis)',
+  iac: 'Infrastructure-as-code misconfigurations',
+  containers: 'Container image vulnerabilities',
 };
 
 export const SEVERITIES = ['critical', 'high', 'medium', 'low', 'info'] as const;
@@ -262,6 +265,21 @@ export const scanningSettingsSchema = z.object({
    * (0 = only the current code). The clone then fetches that much history.
    */
   secretHistoryCommits: z.number().int().min(0).max(1000).default(0),
+  /**
+   * Scan the container images a repository references (Dockerfile FROM, Compose and Kubernetes manifests) for
+   * vulnerable packages. Off by default: images are pulled from their registries.
+   */
+  containerImages: z
+    .object({
+      enabled: z.boolean(),
+      /** Images scanned per repository scan; the rest are reported as skipped. */
+      maxImages: z.number().int().min(1).max(50),
+      /** Lowest severity reported. */
+      minSeverity: z.enum(['critical', 'high', 'medium', 'low']),
+      /** Only report vulnerabilities that have a fixed package version. */
+      fixableOnly: z.boolean(),
+    })
+    .default({ enabled: false, maxImages: 10, minSeverity: 'high', fixableOnly: true }),
 });
 export type ScanningSettings = z.infer<typeof scanningSettingsSchema>;
 
@@ -285,9 +303,19 @@ export const DEFAULT_SCANNING_SETTINGS: ScanningSettings = {
   expiryWarningDays: 30,
   verifySecrets: false,
   secretHistoryCommits: 0,
+  containerImages: { enabled: false, maxImages: 10, minSeverity: 'high', fixableOnly: true },
 };
+
+export interface ToolStatus {
+  available: boolean;
+  version: string | null;
+}
 
 export interface IntelStatusDto {
   feeds: { key: string; label: string; fetchedAt: string | null; entries: number | null; error: string | null }[];
-  gitleaks: { available: boolean; version: string | null };
+  gitleaks: ToolStatus;
+  /** Opengrep (or Semgrep) for code analysis; `rules` is false when no rules directory is configured. */
+  opengrep: ToolStatus & { rules: boolean };
+  /** Trivy for infrastructure-as-code and container image scanning. */
+  trivy: ToolStatus;
 }

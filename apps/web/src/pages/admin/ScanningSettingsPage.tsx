@@ -1,10 +1,10 @@
-import { type IntelStatusDto, type RiskWeights, type ScanningSettings } from '@argus/shared';
+import { type IntelStatusDto, type RiskWeights, type ScanningSettings, type ToolStatus } from '@argus/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, XCircle } from 'lucide-react';
 import { type FormEvent, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { RetentionCard } from '../../components/RetentionCard';
-import { Button, Card, CardHeader, CenteredSpinner, Checkbox, ErrorAlert, Field, Input, PageHeader, Table } from '../../components/ui';
+import { Button, Card, CardHeader, CenteredSpinner, Checkbox, ErrorAlert, Field, Input, PageHeader, Select, Table } from '../../components/ui';
 import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { formatRelative } from '../../lib/utils';
@@ -28,6 +28,24 @@ const list = (s: string) =>
     .split(/[,\n]/)
     .map((x) => x.trim())
     .filter(Boolean);
+
+function ToolRow({ label, tool, missing }: { label: string; tool: ToolStatus; missing: string }) {
+  return (
+    <tr>
+      <td className="px-4 py-2.5">{label}</td>
+      <td className="px-4 py-2.5 text-slate-500">—</td>
+      <td className="px-4 py-2.5 text-sm">
+        {tool.available ? (
+          <span className="inline-flex items-center gap-1 text-green-700 dark:text-green-400">
+            <CheckCircle2 className="size-4" /> Installed ({tool.version})
+          </span>
+        ) : (
+          <span className="text-amber-700 dark:text-amber-400">{missing}</span>
+        )}
+      </td>
+    </tr>
+  );
+}
 
 export function IntelStatusCard() {
   const query = useQuery({ queryKey: ['intel', 'status'], queryFn: () => api<IntelStatusDto>('/intel/status') });
@@ -58,19 +76,13 @@ export function IntelStatusCard() {
               </td>
             </tr>
           ))}
-          <tr>
-            <td className="px-4 py-2.5">Gitleaks secret scanner</td>
-            <td className="px-4 py-2.5 text-slate-500">—</td>
-            <td className="px-4 py-2.5 text-sm">
-              {query.data.gitleaks.available ? (
-                <span className="inline-flex items-center gap-1 text-green-700 dark:text-green-400">
-                  <CheckCircle2 className="size-4" /> Installed ({query.data.gitleaks.version})
-                </span>
-              ) : (
-                <span className="text-amber-700 dark:text-amber-400">Not installed — Argus built-in rules are used</span>
-              )}
-            </td>
-          </tr>
+          <ToolRow label="Gitleaks secret scanner" tool={query.data.gitleaks} missing="Not installed — Argus built-in rules are used" />
+          <ToolRow
+            label="Opengrep code analysis"
+            tool={query.data.opengrep.available && !query.data.opengrep.rules ? { available: false, version: null } : query.data.opengrep}
+            missing={query.data.opengrep.available ? 'Installed, but no rules are configured (ARGUS_OPENGREP_RULES) — code analysis is skipped' : 'Not installed — code analysis is skipped'}
+          />
+          <ToolRow label="Trivy (infrastructure as code, container images)" tool={query.data.trivy} missing="Not installed — infrastructure-as-code and image scanning are skipped" />
         </Table>
       )}
     </Card>
@@ -149,6 +161,38 @@ export function ScanningSettingsPage() {
               <Field label="Commits of history to scan for secrets" hint="0 scans only the current code. Finds secrets that were committed and later deleted; clones fetch this many commits.">
                 {(id) => <Input id={id} type="number" min={0} max={1000} value={form.secretHistoryCommits} onChange={(e) => setForm({ ...form, secretHistoryCommits: Number(e.target.value) })} required />}
               </Field>
+            </div>
+          </Card>
+          <Card>
+            <CardHeader title="Container images" description="Scan the images a repository references (Dockerfile FROM, Docker Compose and Kubernetes manifests) for vulnerable packages, with Trivy." />
+            <div className="space-y-4 p-5">
+              <Checkbox
+                label="Scan referenced container images"
+                description="Off by default. Each image is pulled from its registry, and Trivy downloads its vulnerability database. Private registries need credentials in Trivy's environment (see the documentation). Not available in offline mode."
+                checked={form.containerImages.enabled}
+                onChange={(e) => setForm({ ...form, containerImages: { ...form.containerImages, enabled: e.target.checked } })}
+              />
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Images per scan" hint="The first images by file path are scanned; the rest are listed as not scanned.">
+                  {(id) => <Input id={id} type="number" min={1} max={50} value={form.containerImages.maxImages} onChange={(e) => setForm({ ...form, containerImages: { ...form.containerImages, maxImages: Number(e.target.value) } })} required />}
+                </Field>
+                <Field label="Lowest severity reported">
+                  {(id) => (
+                    <Select id={id} value={form.containerImages.minSeverity} onChange={(e) => setForm({ ...form, containerImages: { ...form.containerImages, minSeverity: e.target.value as ScanningSettings['containerImages']['minSeverity'] } })}>
+                      <option value="critical">Critical</option>
+                      <option value="high">High</option>
+                      <option value="medium">Medium</option>
+                      <option value="low">Low</option>
+                    </Select>
+                  )}
+                </Field>
+              </div>
+              <Checkbox
+                label="Only vulnerabilities with a fix"
+                description="Skip vulnerabilities that have no fixed package version yet; there is nothing to act on until there is."
+                checked={form.containerImages.fixableOnly}
+                onChange={(e) => setForm({ ...form, containerImages: { ...form.containerImages, fixableOnly: e.target.checked } })}
+              />
             </div>
           </Card>
         </fieldset>
