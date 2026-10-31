@@ -1,6 +1,6 @@
 import { type FindingDto, SCANNER_LABELS, type Severity, type SuppressionDto } from '@argus/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertOctagon, ExternalLink, Flame, ShieldOff } from 'lucide-react';
+import { AlertOctagon, BadgeCheck, ExternalLink, Flame, ShieldOff } from 'lucide-react';
 import { type FormEvent, useState } from 'react';
 import { Link } from 'react-router';
 import { toast } from 'sonner';
@@ -9,6 +9,7 @@ import { useAuth } from '../lib/auth';
 import { cn, formatDateTime, formatRelative } from '../lib/utils';
 import { Badge, Button, CenteredSpinner, ErrorAlert, Field, Input, Modal, Select } from './ui';
 import { AiHintPanel } from './ai';
+import { ApproveLicenseModal } from './LicenseExceptions';
 
 const SEVERITY_STYLE: Record<Severity, string> = {
   critical: 'bg-red-600 text-white ring-red-700',
@@ -129,13 +130,14 @@ export function SuppressModal({ finding, onClose }: { finding: FindingDto; onClo
 export function FindingModal({ findingId, onClose }: { findingId: string; onClose(): void }) {
   const { can } = useAuth();
   const [suppressing, setSuppressing] = useState(false);
+  const [approving, setApproving] = useState(false);
   const query = useQuery({ queryKey: ['finding', findingId], queryFn: () => api<FindingDto>(`/findings/${findingId}`) });
   const f = query.data;
   const suppression = (f?.details?.suppression ?? null) as { source: string; reason: string } | null;
 
   return (
     <>
-      <Modal open={!suppressing} onClose={onClose} wide title={f?.title ?? 'Finding'} description={f ? `${f.repoFullName ?? ''} · ${SCANNER_LABELS[f.scanner]}` : undefined}>
+      <Modal open={!suppressing && !approving} onClose={onClose} wide title={f?.title ?? 'Finding'} description={f ? `${f.repoFullName ?? ''} · ${SCANNER_LABELS[f.scanner]}` : undefined}>
         <ErrorAlert error={query.error} />
         {!f ? (
           <CenteredSpinner />
@@ -155,8 +157,13 @@ export function FindingModal({ findingId, onClose }: { findingId: string; onClos
                   View ticket →
                 </Link>
               )}
+              {can('settings:manage') && f.scanner === 'licenses' && f.status === 'open' && f.package && (
+                <Button size="sm" variant="secondary" className="ml-auto" icon={<BadgeCheck className="size-4" />} onClick={() => setApproving(true)}>
+                  Approve license
+                </Button>
+              )}
               {can('tickets:triage') && f.status === 'open' && (
-                <Button size="sm" variant="secondary" className="ml-auto" icon={<ShieldOff className="size-4" />} onClick={() => setSuppressing(true)}>
+                <Button size="sm" variant="secondary" className={f.scanner === 'licenses' && can('settings:manage') && f.package ? '' : 'ml-auto'} icon={<ShieldOff className="size-4" />} onClick={() => setSuppressing(true)}>
                   Suppress
                 </Button>
               )}
@@ -257,6 +264,7 @@ export function FindingModal({ findingId, onClose }: { findingId: string; onClos
         )}
       </Modal>
       {suppressing && f && <SuppressModal finding={f} onClose={() => setSuppressing(false)} />}
+      {approving && f && <ApproveLicenseModal finding={f} onClose={() => setApproving(false)} />}
     </>
   );
 }

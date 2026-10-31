@@ -32,12 +32,16 @@ Runtime policies (password rules, MFA, sessions) are set in the UI under **Admin
 | `ARGUS_OFFLINE` | `false` | `true` turns off every outbound threat-intelligence lookup (OSV, KEV, EPSS, NVD, endoflife.date, registries), news feed fetching, and the AI providers' public APIs (a provider with a private base URL keeps working). See [offline mode](features/scanners-and-findings.md#data-sources-caching-and-offline-mode). |
 | `SCAN` | `true` | `false` stops this instance from running repository scans, for example in local development against a shared database. Scheduled and requested scans are still queued, and an instance with `SCAN=true` runs them. If no instance has it, they wait. |
 | `ARGUS_GITLEAKS_PATH` | `gitleaks` | Gitleaks binary used by the secrets scanner. The Docker image includes it. Without Gitleaks, built-in rules are used. |
+| `ARGUS_OPENGREP_PATH` | `opengrep` | Opengrep binary used for code analysis. `semgrep` also works. The Docker image includes Opengrep. |
+| `ARGUS_OPENGREP_RULES` | — (`/opt/argus/rules/opengrep` in the Docker image) | Folder of Opengrep/Semgrep rule files. Without it, code analysis is skipped. See [Code, infrastructure and container images](features/scanners-and-findings.md#code-infrastructure-and-container-images). |
+| `ARGUS_TRIVY_PATH` | `trivy` | Trivy binary used for infrastructure-as-code and container image scanning. The Docker image includes it. Trivy's own `TRIVY_*` variables (registry credentials, database mirrors, cache folder) are passed through to it. |
 | `ARGUS_OSV_URL` | `https://api.osv.dev` | OSV API base URL, or an internal mirror. |
 | `ARGUS_KEV_URL` | CISA feed URL | URL of the CISA Known Exploited Vulnerabilities JSON feed. |
 | `ARGUS_EPSS_URL` | `https://api.first.org/data/v1/epss` | FIRST EPSS API. |
 | `ARGUS_EOL_URL` | `https://endoflife.date` | endoflife.date base URL. |
 | `ARGUS_NPM_REGISTRY_URL` | `https://registry.npmjs.org` | npm registry, or an internal proxy such as Artifactory or Azure Artifacts. |
 | `ARGUS_NUGET_URL` | `https://api.nuget.org/v3-flatcontainer` | NuGet flat-container endpoint. |
+| `ARGUS_DEPSDEV_URL` | `https://api.deps.dev` | [deps.dev](https://deps.dev) API, used for the latest version, deprecation and license of PyPI, Maven, Go and Cargo packages. |
 | `ARGUS_NVD_URL` | `https://services.nvd.nist.gov/rest/json/cves/2.0` | NVD CVE API 2.0, used for CVSS scores that OSV does not provide. |
 | `ARGUS_METRICS_TOKEN` | — | Enables Prometheus metrics at `/metrics`; scrapers send it as a bearer token. At least 16 characters. |
 | `ARGUS_NVD_API_KEY` | — | Optional [NVD API key](https://nvd.nist.gov/developers/request-an-api-key). Raises NVD's rate limit from 5 to 50 requests per 30 seconds, so more scores are filled in per scan. Treat it as a secret. |
@@ -72,12 +76,13 @@ Every change is recorded in the audit log, with the before and after values.
 Under **Administration → Scanning settings**:
 
 - **Risk score adjustments.** These are the points added or removed for KEV, EPSS, public repositories, business criticality, dev and transitive dependencies, and test paths. See [risk score](features/scanners-and-findings.md#risk-score).
-- **License policy.** SPDX ids that are not allowed (default: AGPL, GPL-2.0, GPL-3.0, SSPL, CPAL, OSL-3.0) or that need review (default: LGPL, MPL-2.0, EPL, CDDL, UNLICENSED).
+- **License policy.** SPDX ids that are not allowed (default: AGPL, GPL-2.0, GPL-3.0, SSPL, CPAL, OSL-3.0), that need review (default: LGPL, MPL-2.0, EPL, CDDL, UNLICENSED), and that are always allowed (default: none), plus an option to allow only the listed licenses and a list of approved packages. See [License policy](features/scanners-and-findings.md#license-policy).
 - **Early warnings.**
   - Framework end-of-life warning: default 180 days.
   - Certificate and token expiry warning: default 30 days.
 - **Secrets.** Live verification of detected secrets with their issuer (off by default), and how many recent commits to scan for secrets that were committed and later deleted (default 0: only the current code). See [Secrets: git history and live verification](features/scanners-and-findings.md#secrets-git-history-and-live-verification).
-- **Threat-intelligence status.** When each source was last used, any errors, and whether Gitleaks is installed.
+- **Container images.** Whether to scan the images a repository references (off by default), how many per scan, the lowest severity reported, and whether to report only fixable vulnerabilities.
+- **Threat-intelligence status.** When each source was last used, any errors, and whether Gitleaks, Opengrep and Trivy are installed.
 
 Changes apply from the next scan.
 

@@ -41,9 +41,13 @@ See [Sources, repositories and scans](sources-and-repositories.md).
 | Secrets in recent git history (configurable number of commits, opt-in) | ✅ |
 | **npm vulnerabilities, deprecations and latest versions** (`package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`) | ✅ |
 | **NuGet vulnerabilities and latest versions** (`PackageReference`, central package management, `packages.lock.json`, `packages.config`) | ✅ |
+| **PyPI, Maven/Gradle, Go and Cargo vulnerabilities, deprecations, latest versions and licenses** (`poetry.lock`, `uv.lock`, `Pipfile.lock`, `requirements.txt`, `pyproject.toml`, `pom.xml`, `gradle.lockfile`, `build.gradle`, version catalogs, `go.mod`, `Cargo.lock`, `Cargo.toml`) | ✅ |
 | **Framework / runtime end-of-life** (.NET, .NET Framework, Node.js, Angular, React, Vue, Next.js, NestJS) | ✅ |
 | **Certificate and credential expiry** (certificates, weak keys, key stores and expiring JWTs in repositories) | ✅ |
-| License compliance policy (npm license data) | ✅ |
+| **Code weaknesses (static analysis)** with Opengrep and the community security rules (bundled), or your own rules | ✅ |
+| **Infrastructure-as-code misconfigurations** (Terraform, Kubernetes, Helm, Dockerfiles, CloudFormation, Azure ARM) with Trivy | ✅ |
+| **Container image vulnerabilities** for images referenced in Dockerfiles, Compose and Kubernetes manifests, with Trivy (opt-in) | ✅ |
+| License compliance policy: not allowed, needs review and always-allowed licenses, an allow-list-only mode, and approved packages (also from a finding) | ✅ |
 | NuGet license data (from package .nuspec files) | ✅ |
 | CycloneDX SBOM per repository; organisation-wide package search | ✅ |
 | Credential inventory (tracked secrets with expiry notices; Microsoft Entra ID app secrets and certificates imported daily) — see [Dashboards, reports and credentials](dashboards-and-reports.md#credential-inventory) | ✅ |
@@ -84,7 +88,7 @@ See [Threat intelligence](threat-intelligence.md).
 |---|---|
 | Advisory sources: OSV.dev (including the GitHub Advisory Database), CISA KEV, FIRST EPSS, endoflife.date, with database caching, stale fallback, configurable mirrors and offline mode | ✅ |
 | NVD as an additional CVSS source, for CVEs whose OSV record has no score | ✅ |
-| Security news feeds (RSS/Atom), with AI extraction of npm/NuGet advisories into a review queue (optional auto-approval) | ✅ |
+| Security news feeds (RSS/Atom), with AI extraction of package advisories into a review queue (optional auto-approval) | ✅ |
 | Argus advisories: approved from news or entered by hand, matched by every scan | ✅ |
 | Continuous re-matching of new advisories against every repository's stored dependency inventory, without re-scanning; emerging-threat notifications | ✅ |
 

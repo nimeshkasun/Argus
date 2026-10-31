@@ -1,4 +1,4 @@
-import { type AdvisoryInput, ECOSYSTEMS, type Ecosystem, type Severity, SEVERITIES } from '@argus/shared';
+import { type AdvisoryInput, ECOSYSTEM_LABELS, ECOSYSTEMS, type Ecosystem, type Severity, SEVERITIES } from '@argus/shared';
 import { Field, Input, Select } from './ui';
 
 export type AdvisoryForm = Omit<AdvisoryInput, 'cveIds' | 'references' | 'cvssScore' | 'fixedVersion'> & { cveIds: string; references: string; cvssScore: string; fixedVersion: string };
@@ -39,7 +39,7 @@ export function AdvisoryFields({ value, onChange, idPrefix }: { value: AdvisoryF
             <Select id={`${idPrefix}-${id}`} value={value.ecosystem} onChange={(e) => set({ ecosystem: e.target.value as Ecosystem })}>
               {ECOSYSTEMS.map((e) => (
                 <option key={e} value={e}>
-                  {e === 'npm' ? 'npm' : 'NuGet'}
+                  {ECOSYSTEM_LABELS[e]}
                 </option>
               ))}
             </Select>

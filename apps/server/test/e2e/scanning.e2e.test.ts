@@ -88,6 +88,9 @@ describe.each(harnesses)('scanners, findings & SBOM e2e: $name', (h) => {
       ['licenses', 'ok'],
       ['frameworks', 'ok'],
       ['certificates', 'ok'],
+      ['code', 'skipped'],
+      ['iac', 'skipped'],
+      ['containers', 'skipped'],
     ]);
     expect(run.stats?.dependencies).toBe(3);
     expect(run.stats?.findings).toMatchObject({ new: 5, fixed: 0 });

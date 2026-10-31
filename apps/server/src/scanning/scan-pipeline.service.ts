@@ -15,8 +15,11 @@ import { compileGlobs } from './glob';
 import { IntelService } from './intel.service';
 import { EMPTY_REPO_CONFIG, parseRepoConfig, REPO_CONFIG_FILES, type RepoScanConfig } from './repo-config';
 import { CertificatesScanner } from './scanners/certificates';
+import { CodeScanner } from './scanners/code';
+import { ContainersScanner } from './scanners/containers';
 import { DependenciesScanner } from './scanners/dependencies';
 import { FrameworksScanner } from './scanners/frameworks';
+import { IacScanner } from './scanners/iac';
 import { LicensesScanner } from './scanners/licenses';
 import { SecretsScanner } from './scanners/secrets';
 import { toObservedFinding } from './observe';
@@ -63,7 +66,16 @@ export class ScanPipeline {
   ) {
     this.config = config;
     // Order matters: the license scanner reuses the dependency inventory.
-    this.scanners = [new SecretsScanner(config.gitleaksPath, config.scanTimeoutMs, config.offline ? null : new SecretVerifier()), new DependenciesScanner(intel), new LicensesScanner(), new FrameworksScanner(intel), new CertificatesScanner()];
+    this.scanners = [
+      new SecretsScanner(config.gitleaksPath, config.scanTimeoutMs, config.offline ? null : new SecretVerifier()),
+      new DependenciesScanner(intel),
+      new LicensesScanner(),
+      new FrameworksScanner(intel),
+      new CertificatesScanner(),
+      new CodeScanner(config.opengrepPath, config.opengrepRules, config.scanTimeoutMs),
+      new IacScanner(config.trivyPath, config.scanTimeoutMs, config.offline),
+      new ContainersScanner(config.trivyPath, config.scanTimeoutMs, config.offline, intel),
+    ];
   }
 
   async run(repo: Repository, run: ScanRun, workdir: string, allFiles: RepoFile[], log: (m: string) => void): Promise<PipelineResult> {
@@ -105,6 +117,12 @@ export class ScanPipeline {
       const started = Date.now();
       try {
         const out = await scanner.run(input, shared);
+        if (out.status === 'skipped') {
+          // Its earlier findings stay as they are: nothing was checked.
+          results.push({ scanner: scanner.name, status: 'skipped', findings: 0, durationMs: Date.now() - started, message: out.message });
+          log(`${scanner.name}: skipped (${out.message ?? 'not available'})`);
+          continue;
+        }
         for (const d of out.findings) {
           const o = toObservedFinding(repo, scanner.name, d, settings.riskWeights, rules);
           if (d.secretValue) secretValues.set(o.fingerprint, d.secretValue);

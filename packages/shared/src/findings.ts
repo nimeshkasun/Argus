@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { type FindingAiHintDto } from './ai';
 import { pageFields } from './schemas';
 
-export const SCANNERS = ['secrets', 'dependencies', 'frameworks', 'certificates', 'licenses'] as const;
+export const SCANNERS = ['secrets', 'dependencies', 'frameworks', 'certificates', 'licenses', 'code', 'iac', 'containers'] as const;
 export type ScannerName = (typeof SCANNERS)[number];
 
 export const SCANNER_LABELS: Record<ScannerName, string> = {
@@ -11,6 +11,9 @@ export const SCANNER_LABELS: Record<ScannerName, string> = {
   frameworks: 'End-of-life frameworks & runtimes',
   certificates: 'Certificates & credential expiry',
   licenses: 'License policy',
+  code: 'Code weaknesses (static analysis)',
+  iac: 'Infrastructure-as-code misconfigurations',
+  containers: 'Container image vulnerabilities',
 };
 
 export const SEVERITIES = ['critical', 'high', 'medium', 'low', 'info'] as const;
@@ -19,8 +22,34 @@ export type Severity = (typeof SEVERITIES)[number];
 export const FINDING_STATUSES = ['open', 'suppressed', 'fixed'] as const;
 export type FindingStatus = (typeof FINDING_STATUSES)[number];
 
-export const ECOSYSTEMS = ['npm', 'nuget'] as const;
+export const ECOSYSTEMS = ['npm', 'nuget', 'pypi', 'maven', 'go', 'cargo'] as const;
 export type Ecosystem = (typeof ECOSYSTEMS)[number];
+
+export const ECOSYSTEM_LABELS: Record<Ecosystem, string> = {
+  npm: 'npm',
+  nuget: 'NuGet',
+  pypi: 'PyPI',
+  maven: 'Maven',
+  go: 'Go',
+  cargo: 'Cargo',
+};
+
+/**
+ * Name used to compare packages: NuGet ids and Cargo crate names are case-insensitive, and PyPI names are
+ * normalised per PEP 503 ("Django_REST.framework" and "django-rest-framework" are the same project).
+ * Maven ("group:artifact"), Go module paths and npm names are compared as written.
+ */
+export function canonicalPackageName(ecosystem: Ecosystem, name: string): string {
+  switch (ecosystem) {
+    case 'nuget':
+    case 'cargo':
+      return name.toLowerCase();
+    case 'pypi':
+      return name.toLowerCase().replace(/[-_.]+/g, '-');
+    default:
+      return name;
+  }
+}
 
 /** Score (0-100) to severity band. */
 export function severityForScore(score: number): Severity {
@@ -216,12 +245,30 @@ export const riskWeightsSchema = z.object({
 });
 export type RiskWeights = z.infer<typeof riskWeightsSchema>;
 
+/** A package approved under the license policy, so it raises no license finding. */
+export const licenseExceptionSchema = z.object({
+  /** Package name, or a prefix ending in "*" (e.g. "lightningcss*"). Names are compared as the ecosystem compares them. */
+  package: z.string().trim().min(1).max(214),
+  /** Null for any ecosystem. */
+  ecosystem: z.enum(ECOSYSTEMS).nullable().default(null),
+  /** Only while the package is under this license (SPDX id or prefix ending in "*"); null for any license. */
+  license: z.string().trim().min(1).max(100).nullable().default(null),
+  reason: z.string().trim().min(5).max(500),
+});
+export type LicenseException = z.infer<typeof licenseExceptionSchema>;
+
 export const scanningSettingsSchema = z.object({
   riskWeights: riskWeightsSchema,
   /** SPDX ids or prefixes (ending in "*") that are not allowed. */
   licenseDeny: z.array(z.string().trim().min(1).max(100)).max(200),
   /** SPDX ids or prefixes that are allowed but flagged for review. */
   licenseReview: z.array(z.string().trim().min(1).max(100)).max(200),
+  /** SPDX ids or prefixes that are always acceptable, even when a deny or review pattern also matches. */
+  licenseAllow: z.array(z.string().trim().min(1).max(100)).max(200).default([]),
+  /** Only allowed licenses are acceptable: any other declared license needs review (denied ones stay denied). */
+  licenseAllowOnly: z.boolean().default(false),
+  /** Packages approved regardless of the policy. */
+  licenseExceptions: z.array(licenseExceptionSchema).max(500).default([]),
   /** Warn this many days before a framework/runtime reaches end of life. */
   eolWarningDays: z.number().int().min(0).max(730),
   /** Warn this many days before a certificate or token expires. */
@@ -236,6 +283,21 @@ export const scanningSettingsSchema = z.object({
    * (0 = only the current code). The clone then fetches that much history.
    */
   secretHistoryCommits: z.number().int().min(0).max(1000).default(0),
+  /**
+   * Scan the container images a repository references (Dockerfile FROM, Compose and Kubernetes manifests) for
+   * vulnerable packages. Off by default: images are pulled from their registries.
+   */
+  containerImages: z
+    .object({
+      enabled: z.boolean(),
+      /** Images scanned per repository scan; the rest are reported as skipped. */
+      maxImages: z.number().int().min(1).max(50),
+      /** Lowest severity reported. */
+      minSeverity: z.enum(['critical', 'high', 'medium', 'low']),
+      /** Only report vulnerabilities that have a fixed package version. */
+      fixableOnly: z.boolean(),
+    })
+    .default({ enabled: false, maxImages: 10, minSeverity: 'high', fixableOnly: true }),
 });
 export type ScanningSettings = z.infer<typeof scanningSettingsSchema>;
 
@@ -255,13 +317,26 @@ export const DEFAULT_SCANNING_SETTINGS: ScanningSettings = {
   },
   licenseDeny: ['AGPL-*', 'GPL-2.0*', 'GPL-3.0*', 'SSPL-1.0', 'CPAL-1.0', 'OSL-3.0'],
   licenseReview: ['LGPL-*', 'MPL-2.0', 'EPL-*', 'CDDL-*', 'UNLICENSED'],
+  licenseAllow: [],
+  licenseAllowOnly: false,
+  licenseExceptions: [],
   eolWarningDays: 180,
   expiryWarningDays: 30,
   verifySecrets: false,
   secretHistoryCommits: 0,
+  containerImages: { enabled: false, maxImages: 10, minSeverity: 'high', fixableOnly: true },
 };
+
+export interface ToolStatus {
+  available: boolean;
+  version: string | null;
+}
 
 export interface IntelStatusDto {
   feeds: { key: string; label: string; fetchedAt: string | null; entries: number | null; error: string | null }[];
-  gitleaks: { available: boolean; version: string | null };
+  gitleaks: ToolStatus;
+  /** Opengrep (or Semgrep) for code analysis; `rules` is false when no rules directory is configured. */
+  opengrep: ToolStatus & { rules: boolean };
+  /** Trivy for infrastructure-as-code and container image scanning. */
+  trivy: ToolStatus;
 }

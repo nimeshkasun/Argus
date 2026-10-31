@@ -1,12 +1,27 @@
 import { type Dependency, type Finding, type Repository } from '@argus/data';
+import { canonicalPackageName, type Ecosystem } from '@argus/shared';
 
-/** Package URL (https://github.com/package-url/purl-spec) for npm and NuGet packages. */
-export function purl(ecosystem: 'npm' | 'nuget', name: string, version: string): string {
-  if (ecosystem === 'npm') {
-    const encoded = name.startsWith('@') ? `%40${name.slice(1).split('/').map(encodeURIComponent).join('/')}` : encodeURIComponent(name);
-    return `pkg:npm/${encoded}@${encodeURIComponent(version)}`;
+const segments = (path: string) => path.split('/').map(encodeURIComponent).join('/');
+
+/** Package URL (https://github.com/package-url/purl-spec) of a package version. */
+export function purl(ecosystem: Ecosystem, name: string, version: string): string {
+  const v = encodeURIComponent(version);
+  switch (ecosystem) {
+    case 'npm':
+      return `pkg:npm/${name.startsWith('@') ? `%40${segments(name.slice(1))}` : encodeURIComponent(name)}@${v}`;
+    case 'nuget':
+      return `pkg:nuget/${encodeURIComponent(name)}@${v}`;
+    case 'pypi':
+      return `pkg:pypi/${encodeURIComponent(canonicalPackageName('pypi', name))}@${v}`;
+    case 'maven': {
+      const [group, artifact] = name.split(':');
+      return `pkg:maven/${encodeURIComponent(group)}/${encodeURIComponent(artifact ?? '')}@${v}`;
+    }
+    case 'go':
+      return `pkg:golang/${segments(name)}@${v}`;
+    case 'cargo':
+      return `pkg:cargo/${encodeURIComponent(name)}@${v}`;
   }
-  return `pkg:nuget/${encodeURIComponent(name)}@${encodeURIComponent(version)}`;
 }
 
 function licenseEntry(license: string | null) {

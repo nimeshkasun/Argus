@@ -5,6 +5,7 @@ import {
   type AdvisoryInput,
   advisoryExtractionOutputSchema,
   DEFAULT_INTEL_SOURCES,
+  ECOSYSTEMS,
   type IntelItemDto,
   type IntelOverviewDto,
   type IntelReviewInput,
@@ -44,7 +45,7 @@ const EXTRACTION_OUTPUT: OutputSpec<AdvisoryExtractionOutput> = {
     additionalProperties: false,
     required: ['relevant', 'advisories', 'rationale', 'confidence'],
     properties: {
-      relevant: { type: 'boolean', description: 'true only if the item announces a vulnerability in a package published on npm or NuGet.' },
+      relevant: { type: 'boolean', description: 'true only if the item announces a vulnerability in a package published on npm, NuGet, PyPI, Maven Central, the Go module proxy or crates.io.' },
       advisories: {
         type: 'array',
         items: {
@@ -52,9 +53,9 @@ const EXTRACTION_OUTPUT: OutputSpec<AdvisoryExtractionOutput> = {
           additionalProperties: false,
           required: ['ecosystem', 'packageName', 'affectedRange', 'fixedVersion', 'severity', 'cveIds', 'title', 'summary'],
           properties: {
-            ecosystem: { type: 'string', enum: ['npm', 'nuget'] },
-            packageName: { ...str, description: 'Exact package id as published on npm or NuGet.' },
-            affectedRange: { ...str, description: 'npm-style semver range of vulnerable versions, e.g. "<4.17.21" or ">=2.0.0 <2.3.1".' },
+            ecosystem: { type: 'string', enum: [...ECOSYSTEMS] },
+            packageName: { ...str, description: 'Exact package id as published: an npm or NuGet id, a PyPI project name, "groupId:artifactId" for Maven, a Go module path or a crate name.' },
+            affectedRange: { ...str, description: 'Range of vulnerable versions with comparators separated by spaces, e.g. "<4.17.21" or ">=2.0.0 <2.3.1" (npm-style for npm, NuGet, Go and Cargo).' },
             fixedVersion: { anyOf: [str, { type: 'null' }] },
             severity: { type: 'string', enum: ['critical', 'high', 'medium', 'low', 'info'] },
             cveIds: { type: 'array', items: str },
@@ -71,7 +72,7 @@ const EXTRACTION_OUTPUT: OutputSpec<AdvisoryExtractionOutput> = {
 };
 
 const EXTRACTION_INSTRUCTIONS = [
-  'Below is an item from a security news or advisory feed. Identify vulnerabilities it announces in packages published on npm or NuGet.',
+  'Below is an item from a security news or advisory feed. Identify vulnerabilities it announces in packages published on npm, NuGet, PyPI, Maven Central, the Go module proxy or crates.io.',
   'For each affected package give the exact package id, an npm-style range of the vulnerable versions, the first fixed version (or null), a severity, any CVE ids, a short title and a summary.',
   'Products that are not npm or NuGet packages (operating systems, the Node.js or .NET runtimes themselves, SaaS products, browsers) are out of scope: report them only if the item names an affected npm or NuGet package.',
   'If the item does not announce such a vulnerability, set relevant to false and return no advisories. Never invent package names, versions or CVE ids that are not in the item.',
@@ -242,7 +243,7 @@ export class NewsService implements OnModuleInit {
     const o = res.output;
     // Keep only proposals Argus can act on: a parseable range and well-formed CVE ids.
     const candidates: AdvisoryInput[] = o.advisories
-      .filter((a) => isValidRange(a.affectedRange))
+      .filter((a) => isValidRange(a.ecosystem, a.affectedRange))
       .map((a) => ({ ...a, cveIds: a.cveIds.filter((c) => CVE.test(c)), cvssScore: null, references: item.link && item.link.startsWith('https://') ? [item.link] : [] }));
     const extraction = { provider: res.provider, model: res.model, confidence: o.confidence, rationale: o.rationale, at: new Date() };
     if (!o.relevant || !candidates.length) {
@@ -337,6 +338,6 @@ export class NewsService implements OnModuleInit {
   }
 }
 
-export function assertRange(a: Pick<AdvisoryInput, 'affectedRange' | 'packageName'>): void {
-  if (!isValidRange(a.affectedRange)) throw new BadRequestException({ statusCode: 400, message: `"${a.affectedRange}" is not a valid version range for ${a.packageName}. Use npm-style ranges such as "<4.17.21" or ">=2.0.0 <2.3.1".`, issues: [{ path: 'affectedRange', message: 'Not a valid version range.' }] });
+export function assertRange(a: Pick<AdvisoryInput, 'ecosystem' | 'affectedRange' | 'packageName'>): void {
+  if (!isValidRange(a.ecosystem, a.affectedRange)) throw new BadRequestException({ statusCode: 400, message: `"${a.affectedRange}" is not a valid version range for ${a.packageName}. Use npm-style ranges such as "<4.17.21" or ">=2.0.0 <2.3.1".`, issues: [{ path: 'affectedRange', message: 'Not a valid version range.' }] });
 }

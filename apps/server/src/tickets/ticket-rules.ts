@@ -47,6 +47,10 @@ export function leadFinding(findings: Finding[]): Finding {
 
 export function ticketTitle(findings: Finding[]): string {
   const lead = leadFinding(findings);
+  if (lead.scanner === 'containers' && typeof lead.details?.image === 'string') {
+    const open = findings.filter((f) => f.status === 'open' && f.advisory).length;
+    return open ? `Container image ${lead.details.image}: ${open} vulnerabilit${open === 1 ? 'y' : 'ies'}` : `Container image ${lead.details.image}: ${lead.title}`;
+  }
   const locations = new Set(findings.map((f) => f.path).filter(Boolean)).size;
   return locations > 1 ? `${lead.title} (+${locations - 1} more location${locations > 2 ? 's' : ''})` : lead.title;
 }

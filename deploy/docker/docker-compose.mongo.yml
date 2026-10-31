@@ -65,6 +65,10 @@ services:
       ARGUS_ENTRA_LOGIN_URL: ${ARGUS_ENTRA_LOGIN_URL:-}
       ARGUS_NPM_REGISTRY_URL: ${ARGUS_NPM_REGISTRY_URL:-}
       ARGUS_NUGET_URL: ${ARGUS_NUGET_URL:-}
+      ARGUS_DEPSDEV_URL: ${ARGUS_DEPSDEV_URL:-}
+      # The image's bundled rules unless overridden (an empty value would turn code analysis off).
+      ARGUS_OPENGREP_RULES: ${ARGUS_OPENGREP_RULES:-/opt/argus/rules/opengrep}
+      # Trivy's own settings (registry credentials, database mirrors) can be added here, e.g. TRIVY_USERNAME, TRIVY_PASSWORD.
       ARGUS_NVD_URL: ${ARGUS_NVD_URL:-}
       ARGUS_NVD_API_KEY: ${ARGUS_NVD_API_KEY:-}
       ARGUS_METRICS_TOKEN: ${ARGUS_METRICS_TOKEN:-}

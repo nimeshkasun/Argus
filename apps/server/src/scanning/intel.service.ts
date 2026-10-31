@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { type Advisory, type DataStore } from '@argus/data';
-import { type Ecosystem } from '@argus/shared';
+import { canonicalPackageName, type Ecosystem } from '@argus/shared';
 import { AppConfig } from '../config/app-config';
 import { DATA_STORE } from '../core/tokens';
 import { nuspecLicense } from './parsers/nuget';
@@ -71,9 +71,23 @@ export interface PackageRef {
   version: string;
 }
 
-const OSV_ECOSYSTEM: Record<Ecosystem, string> = { npm: 'npm', nuget: 'NuGet' };
+/** OSV.dev ecosystem names. */
+export const OSV_ECOSYSTEM: Record<Ecosystem, string> = { npm: 'npm', nuget: 'NuGet', pypi: 'PyPI', maven: 'Maven', go: 'Go', cargo: 'crates.io' };
+/** deps.dev systems, for ecosystems without a registry client of their own. */
+const DEPSDEV_SYSTEM: Partial<Record<Ecosystem, string>> = { pypi: 'pypi', maven: 'maven', go: 'go', cargo: 'cargo' };
 
-export const packageKey = (p: PackageRef) => `${p.ecosystem}|${p.ecosystem === 'nuget' ? p.name.toLowerCase() : p.name}|${p.version}`;
+export const packageKey = (p: PackageRef) => `${p.ecosystem}|${canonicalPackageName(p.ecosystem, p.name)}|${p.version}`;
+
+interface DepsDevInfo extends PackageMeta {
+  license: string | null;
+}
+
+/** deps.dev lists each declared license as an SPDX expression; "non-standard" marks one it could not map. */
+function depsDevLicense(licenses: string[] | undefined): string | null {
+  const ids = (licenses ?? []).filter((l) => l && l !== 'non-standard');
+  if (ids.length <= 1) return ids[0] ?? null;
+  return ids.map((l) => (/\s/.test(l) ? `(${l})` : l)).join(' AND ');
+}
 
 /** Runs `fn` over items with bounded concurrency. */
 export async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
@@ -342,8 +356,43 @@ export class IntelService {
     return license;
   }
 
+  /**
+   * Latest version, deprecation and license of a PyPI, Maven, Go or Cargo package version from deps.dev, which
+   * reads them from each ecosystem's registry. The latest version is deps.dev's default (latest stable) version.
+   */
+  private depsDev(p: PackageRef): Promise<DepsDevInfo> {
+    return this.cached<DepsDevInfo>(`depsdev:${packageKey(p)}`, DAY, async () => {
+      const name = p.ecosystem === 'pypi' ? canonicalPackageName('pypi', p.name) : p.name;
+      const base = `${this.config.intel.depsDev}/v3/systems/${DEPSDEV_SYSTEM[p.ecosystem]}/packages/${encodeURIComponent(name)}`;
+      const notFound = (err: unknown) => {
+        if (err instanceof IntelError && err.message.startsWith('404')) return null;
+        throw err;
+      };
+      const [pkg, version] = await Promise.all([
+        this.fetchJson<{ versions?: { versionKey: { version: string }; isDefault?: boolean }[] }>(base).catch(notFound),
+        this.fetchJson<{ licenses?: string[]; isDeprecated?: boolean; deprecatedReason?: string }>(`${base}/versions/${encodeURIComponent(p.version)}`).catch(notFound),
+      ]);
+      return {
+        latest: pkg?.versions?.find((v) => v.isDefault)?.versionKey.version ?? null,
+        deprecated: version?.isDeprecated ? version.deprecatedReason || 'Deprecated' : null,
+        license: depsDevLicense(version?.licenses),
+      };
+    });
+  }
+
+  /** Declared license of a package version, for ecosystems whose manifests do not carry it (null for npm). */
+  async packageLicense(p: PackageRef): Promise<string | null> {
+    if (p.ecosystem === 'nuget') return this.nugetLicense(p.name, p.version);
+    if (DEPSDEV_SYSTEM[p.ecosystem]) return (await this.depsDev(p)).license;
+    return null;
+  }
+
   /** Latest stable version and deprecation status of a package version from the public registry. */
   async packageMeta(p: PackageRef): Promise<PackageMeta> {
+    if (DEPSDEV_SYSTEM[p.ecosystem]) {
+      const { latest, deprecated } = await this.depsDev(p);
+      return { latest, deprecated };
+    }
     return this.cached<PackageMeta>(`pkg:${packageKey(p)}`, DAY, async () => {
       if (p.ecosystem === 'npm') {
         const name = p.name.startsWith('@') ? `@${encodeURIComponent(p.name.slice(1))}` : encodeURIComponent(p.name);

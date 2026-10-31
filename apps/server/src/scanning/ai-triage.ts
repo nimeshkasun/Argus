@@ -16,6 +16,10 @@ const TRIAGED_SEVERITIES = new Set(['critical', 'high', 'medium']);
 const SOURCE_EXTENSIONS: Record<string, RegExp> = {
   npm: /\.(?:[cm]?js|jsx|tsx?|vue|svelte)$/i,
   nuget: /\.(?:cs|fs|vb|cshtml|razor)$/i,
+  pypi: /\.pyw?$/i,
+  maven: /\.(?:java|kt|kts|scala|groovy)$/i,
+  go: /\.go$/i,
+  cargo: /\.rs$/i,
 };
 
 const SECRET_INSTRUCTIONS = [
@@ -51,6 +55,15 @@ function usagePattern(ecosystem: string, name: string): RegExp | null {
   const n = escapeRegex(name);
   if (ecosystem === 'npm') return new RegExp(`(?:require\\(\\s*|from\\s+|import\\s*\\(?\\s*)["'\`]${n}(?:/[^"'\`]*)?["'\`]`);
   if (ecosystem === 'nuget') return new RegExp(`\\busing\\s+(?:static\\s+)?${n}\\b|\\b${n}\\.[A-Z]`);
+  // Python import names usually match the project name with "-" as "_" (not always, e.g. "beautifulsoup4" is "bs4").
+  if (ecosystem === 'pypi') {
+    const mod = escapeRegex(name.toLowerCase().replace(/[-.]/g, '_'));
+    return new RegExp(`^\\s*(?:from\\s+${mod}(?:\\.|\\s)|import\\s+${mod}\\b)`, 'im');
+  }
+  // Maven: imports of the group's packages ("org.apache.logging.log4j:log4j-core" -> "import org.apache.logging.log4j").
+  if (ecosystem === 'maven') return new RegExp(`^\\s*import\\s+(?:static\\s+)?${escapeRegex(name.split(':')[0])}\\.`, 'm');
+  if (ecosystem === 'go') return new RegExp(`"${n}(?:/[^"]*)?"`);
+  if (ecosystem === 'cargo') return new RegExp(`\\b(?:use|extern\\s+crate)\\s+${escapeRegex(name.replace(/-/g, '_'))}\\b|\\b${escapeRegex(name.replace(/-/g, '_'))}::`);
   return null;
 }
 

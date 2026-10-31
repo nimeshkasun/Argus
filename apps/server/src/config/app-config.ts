@@ -24,12 +24,16 @@ const envSchema = z.object({
   ARGUS_OFFLINE: z.enum(['true', 'false']).default('false'),
   SCAN: z.enum(['true', 'false']).default('true'),
   ARGUS_GITLEAKS_PATH: z.string().min(1).default('gitleaks'),
+  ARGUS_OPENGREP_PATH: z.string().min(1).default('opengrep'),
+  ARGUS_OPENGREP_RULES: z.string().min(1).optional(),
+  ARGUS_TRIVY_PATH: z.string().min(1).default('trivy'),
   ARGUS_OSV_URL: z.url().default('https://api.osv.dev'),
   ARGUS_KEV_URL: z.url().default('https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json'),
   ARGUS_EPSS_URL: z.url().default('https://api.first.org/data/v1/epss'),
   ARGUS_EOL_URL: z.url().default('https://endoflife.date'),
   ARGUS_NPM_REGISTRY_URL: z.url().default('https://registry.npmjs.org'),
   ARGUS_NUGET_URL: z.url().default('https://api.nuget.org/v3-flatcontainer'),
+  ARGUS_DEPSDEV_URL: z.url().default('https://api.deps.dev'),
   ARGUS_NVD_URL: z.url().default('https://services.nvd.nist.gov/rest/json/cves/2.0'),
   ARGUS_NVD_API_KEY: z.string().min(1).optional(),
   ARGUS_METRICS_TOKEN: z.string().min(16, 'must be at least 16 characters').optional(),
@@ -69,8 +73,12 @@ export class AppConfig {
   /** False: this instance never runs repository scans; queued scans wait for a worker that does (e.g. local development). */
   readonly scanEnabled!: boolean;
   readonly gitleaksPath!: string;
+  readonly opengrepPath!: string;
+  /** Rules directory for code analysis; without one the code scanner is skipped. */
+  readonly opengrepRules!: string | null;
+  readonly trivyPath!: string;
   /** Base URLs of public data sources; point them at internal mirrors if required. */
-  readonly intel!: { osv: string; kev: string; epss: string; eol: string; npmRegistry: string; nuget: string; nvd: string; nvdApiKey: string | null };
+  readonly intel!: { osv: string; kev: string; epss: string; eol: string; npmRegistry: string; nuget: string; depsDev: string; nvd: string; nvdApiKey: string | null };
   /** Microsoft cloud endpoints (override for sovereign clouds such as GCC High). */
   readonly microsoft!: { graph: string; login: string };
   /** Bearer token Prometheus must send to /metrics; null turns the endpoint off. */
@@ -115,6 +123,9 @@ export class AppConfig {
       offline: e.ARGUS_OFFLINE === 'true',
       scanEnabled: e.SCAN === 'true',
       gitleaksPath: e.ARGUS_GITLEAKS_PATH,
+      opengrepPath: e.ARGUS_OPENGREP_PATH,
+      opengrepRules: e.ARGUS_OPENGREP_RULES ? resolve(e.ARGUS_OPENGREP_RULES) : null,
+      trivyPath: e.ARGUS_TRIVY_PATH,
       intel: {
         osv: trimSlash(e.ARGUS_OSV_URL),
         kev: e.ARGUS_KEV_URL,
@@ -122,6 +133,7 @@ export class AppConfig {
         eol: trimSlash(e.ARGUS_EOL_URL),
         npmRegistry: trimSlash(e.ARGUS_NPM_REGISTRY_URL),
         nuget: trimSlash(e.ARGUS_NUGET_URL),
+        depsDev: trimSlash(e.ARGUS_DEPSDEV_URL),
         nvd: trimSlash(e.ARGUS_NVD_URL),
         nvdApiKey: e.ARGUS_NVD_API_KEY ?? null,
       },

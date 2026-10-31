@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { type Collection, type Db, type Filter, MongoServerError } from 'mongodb';
-import { type Ecosystem, INTEL_ITEM_STATUSES, type IntelItemStatus } from '@argus/shared';
+import { canonicalPackageName, type Ecosystem, INTEL_ITEM_STATUSES, type IntelItemStatus } from '@argus/shared';
 import {
   type Advisory,
   type AdvisoryListFilter,
@@ -28,7 +28,7 @@ function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-const packageKeyOf = (ecosystem: string, name: string) => (ecosystem === 'nuget' ? name.toLowerCase() : name);
+const packageKeyOf = (ecosystem: Ecosystem, name: string) => canonicalPackageName(ecosystem, name);
 
 export class MongoIntelSourceRepo implements IntelSourceRepo {
   constructor(

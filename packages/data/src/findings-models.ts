@@ -1,4 +1,4 @@
-import { type FindingAdvisory, type FindingPackage, type FindingSecret, type FindingStatus, type RiskFactor, type ScannerName, type Severity } from '@argus/shared';
+import { type Ecosystem, type FindingAdvisory, type FindingPackage, type FindingSecret, type FindingStatus, type RiskFactor, type ScannerName, type Severity } from '@argus/shared';
 
 export interface Finding {
   id: string;
@@ -75,7 +75,7 @@ export interface FindingSummaryRecord {
 export interface Dependency {
   repoId: string;
   teamId: string | null;
-  ecosystem: 'npm' | 'nuget';
+  ecosystem: Ecosystem;
   name: string;
   version: string;
   direct: boolean;
@@ -89,7 +89,7 @@ export interface Dependency {
 
 export interface DependencyListFilter {
   search?: string;
-  ecosystem?: 'npm' | 'nuget';
+  ecosystem?: Ecosystem;
   vulnerableOnly?: boolean;
   offset: number;
   limit: number;
@@ -98,7 +98,7 @@ export interface DependencyListFilter {
 export interface DependencySearchFilter {
   /** Exact package name, case-insensitive. */
   name: string;
-  ecosystem?: 'npm' | 'nuget';
+  ecosystem?: Ecosystem;
   visibleTeamIds?: string[];
   limit: number;
 }

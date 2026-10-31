@@ -202,7 +202,7 @@ const fakeIntel = (over: Partial<Record<keyof IntelService, unknown>> = {}) =>
         ],
       ]),
     argusAdvisories: async () => [],
-    nugetLicense: async (name: string) => (name.toLowerCase() === 'newtonsoft.json' ? 'MIT' : null),
+    packageLicense: async (p: { name: string }) => (p.name.toLowerCase() === 'newtonsoft.json' ? 'MIT' : null),
     nvdCvss: async () => new Map(),
     kev: async () => new Set(['CVE-2021-23337']),
     epss: async () => new Map([['CVE-2021-23337', 0.5]]),

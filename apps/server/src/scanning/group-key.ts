@@ -1,4 +1,4 @@
-import { type FindingPackage, type FindingSecret, type ScannerName } from '@argus/shared';
+import { canonicalPackageName, type FindingPackage, type FindingSecret, type ScannerName } from '@argus/shared';
 
 export interface GroupableFinding {
   scanner: ScannerName;
@@ -15,7 +15,7 @@ export interface GroupableFinding {
  * release cycle used by several projects.
  */
 export function groupKeyFor(f: GroupableFinding): string {
-  const pkg = f.package ? `${f.package.ecosystem}:${f.package.ecosystem === 'nuget' ? f.package.name.toLowerCase() : f.package.name}` : '';
+  const pkg = f.package ? `${f.package.ecosystem}:${canonicalPackageName(f.package.ecosystem, f.package.name)}` : '';
   switch (f.scanner) {
     case 'dependencies':
     case 'licenses':
@@ -26,5 +26,12 @@ export function groupKeyFor(f: GroupableFinding): string {
       return `frameworks|${String(f.details?.product ?? f.ruleId)}|${String(f.details?.cycle ?? f.path)}`;
     case 'certificates':
       return `certificates|${f.ruleId}|${String(f.details?.fingerprintSha256 ?? f.secret?.hash ?? f.path)}`;
+    // One ticket per rule per file: a weakness repeated in a file is fixed together.
+    case 'code':
+    case 'iac':
+      return `${f.scanner}|${f.ruleId}|${f.path}`;
+    // One ticket per image: its vulnerabilities are fixed together, by moving to a patched image.
+    case 'containers':
+      return `containers|${String(f.details?.image ?? f.path)}`;
   }
 }

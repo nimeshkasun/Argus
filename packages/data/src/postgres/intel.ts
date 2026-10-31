@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { type Kysely, type Selectable, sql } from 'kysely';
-import { type AdvisorySource, type Ecosystem, INTEL_ITEM_STATUSES, type IntelItemStatus, type Severity } from '@argus/shared';
+import { type AdvisorySource, canonicalPackageName, type Ecosystem, INTEL_ITEM_STATUSES, type IntelItemStatus, type Severity } from '@argus/shared';
 import {
   type Advisory,
   type AdvisoryListFilter,
@@ -23,7 +23,7 @@ function likePattern(term: string): string {
   return `%${term.replace(/[\\%_]/g, (m) => `\\${m}`)}%`;
 }
 
-export const packageKeyOf = (ecosystem: string, name: string) => (ecosystem === 'nuget' ? name.toLowerCase() : name);
+export const packageKeyOf = (ecosystem: Ecosystem, name: string) => canonicalPackageName(ecosystem, name);
 
 export class PgIntelSourceRepo implements IntelSourceRepo {
   constructor(private readonly db: Db) {}
