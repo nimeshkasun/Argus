@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, XCircle } from 'lucide-react';
 import { type FormEvent, useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { LicenseExceptionsEditor } from '../../components/LicenseExceptions';
 import { RetentionCard } from '../../components/RetentionCard';
 import { Button, Card, CardHeader, CenteredSpinner, Checkbox, ErrorAlert, Field, Input, PageHeader, Select, Table } from '../../components/ui';
 import { api } from '../../lib/api';
@@ -97,11 +98,13 @@ export function ScanningSettingsPage() {
   const [form, setForm] = useState<ScanningSettings | null>(null);
   const [deny, setDeny] = useState('');
   const [review, setReview] = useState('');
+  const [allow, setAllow] = useState('');
   useEffect(() => {
     if (!query.data) return;
     setForm(query.data);
     setDeny(query.data.licenseDeny.join(', '));
     setReview(query.data.licenseReview.join(', '));
+    setAllow(query.data.licenseAllow.join(', '));
   }, [query.data]);
   const save = useMutation({
     mutationFn: (body: ScanningSettings) => api<ScanningSettings>('/settings/scanning', { method: 'PUT', body }),
@@ -113,7 +116,7 @@ export function ScanningSettingsPage() {
   if (!form) return <CenteredSpinner />;
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    save.mutate({ ...form, licenseDeny: list(deny), licenseReview: list(review) });
+    save.mutate({ ...form, licenseDeny: list(deny), licenseReview: list(review), licenseAllow: list(allow) });
   };
 
   return (
@@ -134,9 +137,27 @@ export function ScanningSettingsPage() {
           </Card>
           <Card>
             <CardHeader title="License policy" description="SPDX identifiers, comma-separated. A trailing * matches prefixes (e.g. GPL-3.0* matches GPL-3.0-only and GPL-3.0-or-later)." />
-            <div className="grid gap-4 p-5 sm:grid-cols-2">
+            <div className="grid gap-4 p-5 sm:grid-cols-3">
               <Field label="Not allowed">{(id) => <Input id={id} value={deny} onChange={(e) => setDeny(e.target.value)} />}</Field>
               <Field label="Needs review">{(id) => <Input id={id} value={review} onChange={(e) => setReview(e.target.value)} />}</Field>
+              <Field label="Always allowed" hint="Wins over the other two lists, e.g. LGPL-2.1-only while LGPL-* needs review.">
+                {(id) => <Input id={id} value={allow} onChange={(e) => setAllow(e.target.value)} />}
+              </Field>
+            </div>
+            <div className="border-t border-slate-100 p-5 dark:border-slate-800">
+              <Checkbox
+                label="Only allow the licenses listed as always allowed"
+                description="Any other declared license then needs review. Licenses that are not allowed stay not allowed, and packages without license data are not flagged."
+                checked={form.licenseAllowOnly}
+                onChange={(e) => setForm({ ...form, licenseAllowOnly: e.target.checked })}
+              />
+            </div>
+            <div className="space-y-3 border-t border-slate-100 p-5 dark:border-slate-800">
+              <div>
+                <div className="text-sm font-medium">Approved packages</div>
+                <p className="text-sm text-slate-500 dark:text-slate-400">Packages that are never flagged, optionally only under one license. Existing findings for them close at each repository's next scan.</p>
+              </div>
+              <LicenseExceptionsEditor value={form.licenseExceptions} onChange={(licenseExceptions) => setForm({ ...form, licenseExceptions })} disabled={!manage} />
             </div>
           </Card>
           <Card>

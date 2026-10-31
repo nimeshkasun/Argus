@@ -76,7 +76,7 @@ Every change is recorded in the audit log, with the before and after values.
 Under **Administration → Scanning settings**:
 
 - **Risk score adjustments.** These are the points added or removed for KEV, EPSS, public repositories, business criticality, dev and transitive dependencies, and test paths. See [risk score](features/scanners-and-findings.md#risk-score).
-- **License policy.** SPDX ids that are not allowed (default: AGPL, GPL-2.0, GPL-3.0, SSPL, CPAL, OSL-3.0) or that need review (default: LGPL, MPL-2.0, EPL, CDDL, UNLICENSED).
+- **License policy.** SPDX ids that are not allowed (default: AGPL, GPL-2.0, GPL-3.0, SSPL, CPAL, OSL-3.0), that need review (default: LGPL, MPL-2.0, EPL, CDDL, UNLICENSED), and that are always allowed (default: none), plus an option to allow only the listed licenses and a list of approved packages. See [License policy](features/scanners-and-findings.md#license-policy).
 - **Early warnings.**
   - Framework end-of-life warning: default 180 days.
   - Certificate and token expiry warning: default 30 days.

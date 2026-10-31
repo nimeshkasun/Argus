@@ -245,12 +245,30 @@ export const riskWeightsSchema = z.object({
 });
 export type RiskWeights = z.infer<typeof riskWeightsSchema>;
 
+/** A package approved under the license policy, so it raises no license finding. */
+export const licenseExceptionSchema = z.object({
+  /** Package name, or a prefix ending in "*" (e.g. "lightningcss*"). Names are compared as the ecosystem compares them. */
+  package: z.string().trim().min(1).max(214),
+  /** Null for any ecosystem. */
+  ecosystem: z.enum(ECOSYSTEMS).nullable().default(null),
+  /** Only while the package is under this license (SPDX id or prefix ending in "*"); null for any license. */
+  license: z.string().trim().min(1).max(100).nullable().default(null),
+  reason: z.string().trim().min(5).max(500),
+});
+export type LicenseException = z.infer<typeof licenseExceptionSchema>;
+
 export const scanningSettingsSchema = z.object({
   riskWeights: riskWeightsSchema,
   /** SPDX ids or prefixes (ending in "*") that are not allowed. */
   licenseDeny: z.array(z.string().trim().min(1).max(100)).max(200),
   /** SPDX ids or prefixes that are allowed but flagged for review. */
   licenseReview: z.array(z.string().trim().min(1).max(100)).max(200),
+  /** SPDX ids or prefixes that are always acceptable, even when a deny or review pattern also matches. */
+  licenseAllow: z.array(z.string().trim().min(1).max(100)).max(200).default([]),
+  /** Only allowed licenses are acceptable: any other declared license needs review (denied ones stay denied). */
+  licenseAllowOnly: z.boolean().default(false),
+  /** Packages approved regardless of the policy. */
+  licenseExceptions: z.array(licenseExceptionSchema).max(500).default([]),
   /** Warn this many days before a framework/runtime reaches end of life. */
   eolWarningDays: z.number().int().min(0).max(730),
   /** Warn this many days before a certificate or token expires. */
@@ -299,6 +317,9 @@ export const DEFAULT_SCANNING_SETTINGS: ScanningSettings = {
   },
   licenseDeny: ['AGPL-*', 'GPL-2.0*', 'GPL-3.0*', 'SSPL-1.0', 'CPAL-1.0', 'OSL-3.0'],
   licenseReview: ['LGPL-*', 'MPL-2.0', 'EPL-*', 'CDDL-*', 'UNLICENSED'],
+  licenseAllow: [],
+  licenseAllowOnly: false,
+  licenseExceptions: [],
   eolWarningDays: 180,
   expiryWarningDays: 30,
   verifySecrets: false,

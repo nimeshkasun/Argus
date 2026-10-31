@@ -6,9 +6,9 @@ import { compileGlobs, globToRegExp } from '../../src/scanning/glob';
 import { parseRepoConfig } from '../../src/scanning/repo-config';
 import { computeRisk, isTestPath } from '../../src/scanning/risk';
 import { fixedVersionFor } from '../../src/scanning/scanners/dependencies';
-import { evaluateLicense } from '../../src/scanning/scanners/licenses';
+import { evaluateLicense, licenseExceptionFor, LicensesScanner } from '../../src/scanning/scanners/licenses';
 import { buildSuppressionRules, matchSuppression } from '../../src/scanning/suppression-matcher';
-import { type DraftFinding } from '../../src/scanning/types';
+import { type DraftFinding, type ScanInput } from '../../src/scanning/types';
 import { compareVersions, highestStable, lowestAbove, majorOf, satisfies } from '../../src/scanning/versions';
 
 describe('CVSS v3 calculator', () => {
@@ -100,6 +100,38 @@ describe('licenses', () => {
     expect(evaluateLicense('MIT AND AGPL-3.0', licenseDeny, licenseReview).verdict).toBe('deny');
     expect(evaluateLicense('LGPL-2.1', licenseDeny, licenseReview).verdict).toBe('review');
     expect(evaluateLicense('GPL-2.0 WITH Classpath-exception-2.0', licenseDeny, licenseReview).verdict).toBe('deny');
+  });
+
+  it('lets allowed licenses win, and flags everything else for review in allow-only mode', () => {
+    expect(evaluateLicense('LGPL-2.1-only', licenseDeny, licenseReview, ['LGPL-2.1-only']).verdict).toBe('ok');
+    expect(evaluateLicense('LGPL-3.0-only', licenseDeny, licenseReview, ['LGPL-2.1-only']).verdict).toBe('review');
+    expect(evaluateLicense('ISC', licenseDeny, licenseReview, ['MIT', 'Apache-2.0'], true)).toEqual({ verdict: 'review', offending: ['ISC'] });
+    expect(evaluateLicense('ISC OR MIT', licenseDeny, licenseReview, ['MIT'], true).verdict).toBe('ok');
+    expect(evaluateLicense('AGPL-3.0', licenseDeny, licenseReview, ['MIT'], true).verdict).toBe('deny');
+  });
+
+  it('matches license exceptions by package (or prefix), ecosystem and license', () => {
+    const exceptions = [
+      { package: 'lightningcss*', ecosystem: 'npm' as const, license: 'MPL-2.0', reason: 'Build tool only, reviewed by legal' },
+      { package: 'Django_Filter', ecosystem: null, license: null, reason: 'Reviewed 2026-10' },
+    ];
+    const dep = (ecosystem: 'npm' | 'pypi', name: string, license: string) => licenseExceptionFor({ ecosystem, name, license }, exceptions)?.reason ?? null;
+    expect(dep('npm', 'lightningcss-linux-x64-gnu', 'MPL-2.0')).toBe('Build tool only, reviewed by legal');
+    expect(dep('npm', 'lightningcss', '(MPL-2.0 OR MIT)')).toBe('Build tool only, reviewed by legal');
+    // A different license, ecosystem or package is not covered.
+    expect(dep('npm', 'lightningcss', 'GPL-3.0-only')).toBeNull();
+    expect(dep('pypi', 'lightningcss', 'MPL-2.0')).toBeNull();
+    expect(dep('npm', 'postcss', 'MPL-2.0')).toBeNull();
+    // Names are compared as the ecosystem compares them.
+    expect(dep('pypi', 'django-filter', 'LGPL-3.0')).toBe('Reviewed 2026-10');
+  });
+
+  it('does not flag approved packages, and says how many were approved', async () => {
+    const settings = { ...DEFAULT_SCANNING_SETTINGS, licenseExceptions: [{ package: 'lightningcss*', ecosystem: null, license: 'MPL-2.0', reason: 'Build tool only' }] };
+    const item = (name: string, license: string) => ({ ecosystem: 'npm' as const, name, version: '1.32.0', direct: false, dev: true, license, manifestPath: 'package-lock.json', latestVersion: null, deprecated: null, vulnerabilities: 0 });
+    const out = await new LicensesScanner().run({ settings } as unknown as ScanInput, { inventory: [item('lightningcss', 'MPL-2.0'), item('lightningcss-darwin-arm64', 'MPL-2.0'), item('other', 'MPL-2.0')] });
+    expect(out.findings.map((f) => f.package?.name)).toEqual(['other']);
+    expect(out.message).toBe('2 package(s) approved by license exceptions');
   });
 });
 

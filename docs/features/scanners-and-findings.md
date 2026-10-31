@@ -52,6 +52,19 @@ Both are off by default and are turned on under **Administration → Scanning se
 
 **Turning scanners off:** every scanner runs by default. Turn one off for a repository under **Repository → Monitoring settings → Scanners**, or in `.argus.yml` (below).
 
+## License policy
+
+The license scanner checks each dependency's declared license (an SPDX expression) against the policy under **Administration → Scanning settings → License policy**:
+
+- **Not allowed** and **Needs review**: SPDX ids, or prefixes ending in `*` (`GPL-3.0*` matches `GPL-3.0-only` and `GPL-3.0-or-later`). A match raises a finding with base score 50 or 25.
+- **Always allowed**: ids or prefixes that are acceptable even when one of the lists above also matches, for example `LGPL-2.1-only` while `LGPL-*` needs review.
+- **Only allow the licenses listed as always allowed**: turns the policy into an allow list. Any other declared license then needs review, and licenses that are not allowed stay not allowed. Packages without license data are counted in the scan log but not flagged.
+- **Approved packages**: packages that are never flagged, by exact name or a prefix ending in `*` (for example `lightningcss*` for all its platform packages), optionally for one ecosystem and only while under one license (approving `MPL-2.0` for a package does not approve a later change to a GPL license). Each one needs a reason, and every change is in the audit log.
+  - A user who can manage settings can also approve a package straight from a license finding (**Approve license**).
+  - Existing findings for an approved package close at each repository's next scan, and their tickets resolve.
+
+In an SPDX expression, `OR` means any acceptable option is enough and `AND` means every part must be acceptable.
+
 ## Code, infrastructure and container images
 
 These three scanners run external tools, like Gitleaks for secrets. The Docker image includes all of them; elsewhere, install them on the `PATH` or set `ARGUS_OPENGREP_PATH` and `ARGUS_TRIVY_PATH`. A scanner whose tool is missing is reported as *skipped* in the scan log, and its earlier findings are left as they are. **Administration → Scanning settings** shows which tools are installed.
