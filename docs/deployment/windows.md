@@ -7,7 +7,7 @@ On a Windows server or VM without Docker, `argus.bat` in the repository root bui
 - Node.js 24 or later, and git (the scanners clone repositories with it).
 - Optional: [Gitleaks](https://github.com/gitleaks/gitleaks) on the `PATH`, or set `ARGUS_GITLEAKS_PATH`. Without it, the secrets scanner uses built-in rules.
 - Optional: [Trivy](https://trivy.dev) on the `PATH`, or set `ARGUS_TRIVY_PATH`, for infrastructure-as-code and container image scanning. Without it, those scanners are skipped.
-- Code analysis needs Opengrep or Semgrep, which do not publish a full Windows build; run Argus in Docker (or on Linux) to use it. Without it, the code scanner is skipped.
+- Optional: [Opengrep](https://github.com/opengrep/opengrep/releases) (`opengrep_windows_x86.exe`, not the `opengrep-core` engine) for code analysis, with `ARGUS_OPENGREP_PATH` pointing at it and `ARGUS_OPENGREP_RULES` at a folder of rules. See [Code, infrastructure and container images](../features/scanners-and-findings.md#code-infrastructure-and-container-images) for the rules the Docker image bundles. Without it, the code scanner is skipped.
 - A PostgreSQL or MongoDB database.
 
 ## First run
