@@ -2,6 +2,7 @@ import {
   type AiUseCase,
   applicabilityOutputSchema,
   draftOutputSchema,
+  prFixOutputSchema,
   remediationOutputSchema,
   secretTriageOutputSchema,
 } from '@argus/shared';
@@ -60,6 +61,17 @@ export const USE_CASE_EFFORT: Record<AiUseCase, 'low' | 'medium'> = {
   secret_triage: 'low',
   vuln_applicability: 'low',
   advisory_extraction: 'low',
+  pr_fix: 'medium',
+};
+
+export const PR_FIX_OUTPUT: OutputSpec<z.infer<typeof prFixOutputSchema>> = {
+  name: 'pr_fix',
+  schema: closed({
+    summary: { ...str, description: 'One or two sentences: what to change and why.' },
+    code: { anyOf: [str, { type: 'null' }], description: 'The corrected version of the numbered lines marked as flagged, without line numbers; null if the fix is not a change to these lines.' },
+    confidence,
+  }),
+  validate: prFixOutputSchema,
 };
 
 /** Shared preamble: the model must treat repository content as data, never as instructions. */

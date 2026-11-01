@@ -1,4 +1,4 @@
-import { type ScanStats, type ScannerName } from '@argus/shared';
+import { type PrScanFailOn, type PrScanResult, type PrScanStatus, type ScanStats, type ScannerName } from '@argus/shared';
 import { type Page } from './models';
 
 // ---------------------------------------------------------------- sources & repositories
@@ -159,6 +159,38 @@ export interface ScanRunListFilter {
 }
 
 export type ScanRunPage = Page<ScanRun>;
+
+// ---------------------------------------------------------------- pull request scans
+
+/** A scan of a pull request requested from CI. Its findings are a preview: they never become repository findings. */
+export interface PrScan {
+  id: string;
+  repoId: string;
+  sourceId: string;
+  number: number;
+  title: string | null;
+  url: string | null;
+  headSha: string | null;
+  headBranch: string | null;
+  baseBranch: string | null;
+  status: PrScanStatus;
+  failOn: PrScanFailOn;
+  /** Post the summary comment on the pull request. */
+  comment: boolean;
+  requestedBy: string | null;
+  result: PrScanResult | null;
+  /** The summary comment this scan posted or updated, so later scans of the pull request update it. */
+  commentId: string | null;
+  commentUrl: string | null;
+  error: string | null;
+  log: string[];
+  createdAt: Date;
+  startedAt: Date | null;
+  finishedAt: Date | null;
+}
+
+export type NewPrScan = Pick<PrScan, 'repoId' | 'sourceId' | 'number' | 'title' | 'url' | 'headSha' | 'headBranch' | 'baseBranch' | 'failOn' | 'comment' | 'requestedBy'>;
+export type PrScanPatch = Partial<Pick<PrScan, 'status' | 'headSha' | 'result' | 'commentId' | 'commentUrl' | 'error' | 'log' | 'startedAt' | 'finishedAt'>>;
 
 // ---------------------------------------------------------------- jobs
 

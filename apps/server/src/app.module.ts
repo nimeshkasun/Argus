@@ -21,6 +21,7 @@ import { ReportsModule } from './reports/reports.module';
 import { CredentialsModule } from './credentials/credentials.module';
 import { SavedViewsModule } from './saved-views/saved-views.module';
 import { JobsModule } from './jobs/jobs.module';
+import { PrScansModule } from './pr-scans/pr-scans.module';
 import { ScansModule } from './scans/scans.module';
 import { SettingsController } from './settings/settings.controller';
 import { SettingsTransferService } from './settings/settings-transfer.service';
@@ -62,6 +63,7 @@ export class AppModule {
         JobsModule,
         SourcesModule,
         ScansModule,
+        PrScansModule,
         FindingsModule,
         TicketsModule,
         AiModule,
@@ -104,6 +106,6 @@ export class AppModule {
 @Module({})
 export class WorkerAppModule {
   static register(config: AppConfig): DynamicModule {
-    return { module: WorkerAppModule, imports: [CoreModule.forRoot(config), loggerModule(config), JobsModule, SourcesModule, ScansModule, TicketsModule, IntelModule, CredentialsModule, WorkerModule] };
+    return { module: WorkerAppModule, imports: [CoreModule.forRoot(config), loggerModule(config), JobsModule, SourcesModule, ScansModule, PrScansModule, TicketsModule, IntelModule, CredentialsModule, WorkerModule] };
   }
 }

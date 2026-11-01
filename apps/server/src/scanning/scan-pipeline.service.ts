@@ -1,7 +1,7 @@
 import { open, readFile } from 'node:fs/promises';
 import { Inject, Injectable } from '@nestjs/common';
 import { type DataStore, type Dependency, type ObservedFinding, type Repository, type ScanRun } from '@argus/data';
-import { type ScannerName, type ScannerRunResult, SCANNERS, type ScanStats, type Severity, SEVERITIES } from '@argus/shared';
+import { type ScannerName, type ScannerRunResult, SCANNERS, type ScanningSettings, type ScanStats, type Severity, SEVERITIES } from '@argus/shared';
 import { AppConfig } from '../config/app-config';
 import { runGit } from '../scans/git';
 import { isVendoredPath } from '../scans/inventory';
@@ -30,6 +30,20 @@ export interface PipelineResult {
   stats: Pick<ScanStats, 'dependencies' | 'scanners' | 'findings'>;
   /** Problems worth surfacing in the scan log (config errors, partial scanners). */
   warnings: string[];
+}
+
+/** What the scanners found in a checkout, scored and with suppressions applied, before anything is stored. */
+export interface PipelineAnalysis {
+  observed: ObservedFinding[];
+  results: ScannerRunResult[];
+  /** Scanners that ran completely; only their unseen findings may be marked fixed. */
+  completed: ScannerName[];
+  warnings: string[];
+  shared: SharedScanState;
+  /** fingerprint -> detected secret, in memory only. */
+  secretValues: Map<string, string>;
+  /** Files after `.argus.yml` ignore rules. */
+  files: RepoFile[];
 }
 
 /** Text content of a file, or null for binary files (a NUL byte in the first 8 KiB) and files over the limit. */
@@ -79,6 +93,52 @@ export class ScanPipeline {
   }
 
   async run(repo: Repository, run: ScanRun, workdir: string, allFiles: RepoFile[], log: (m: string) => void): Promise<PipelineResult> {
+    const { observed, results, completed, warnings, shared, secretValues, files } = await this.analyze(repo, workdir, allFiles, log);
+    const now = new Date();
+    const reconciled = await this.store.findings.reconcile({ repoId: repo.id, sourceId: repo.sourceId, teamId: repo.teamId, runId: run.id, scanners: completed, now }, observed);
+
+    // The inventory is only replaced when the dependency scan produced one, so a failed scan keeps the last good SBOM.
+    if (shared.inventory) {
+      const deps: Dependency[] = shared.inventory.map((d) => ({
+        repoId: repo.id,
+        teamId: repo.teamId,
+        ecosystem: d.ecosystem,
+        name: d.name,
+        version: d.version,
+        direct: d.direct,
+        dev: d.dev,
+        license: d.license,
+        manifestPath: d.manifestPath,
+        latestVersion: d.latestVersion,
+        deprecated: d.deprecated,
+        vulnerabilities: d.vulnerabilities,
+      }));
+      await this.store.dependencies.replaceForRepo(repo.id, deps);
+    }
+
+    // Tickets are opened, updated and resolved from the reconciled findings.
+    await this.events.emit('scan.completed', { repo, run });
+
+    // AI hints need the checkout, so they run before it is deleted. A failure never fails the scan.
+    try {
+      await this.triage.run(repo, files, secretValues, readText, log);
+    } catch (err) {
+      warnings.push(`AI triage failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+
+    const open = Object.fromEntries(SEVERITIES.map((s) => [s, 0])) as Record<Severity, number>;
+    for (const o of observed) if (!o.suppressionId) open[o.severity]++;
+    return {
+      stats: { dependencies: shared.inventory?.length, scanners: results, findings: { open, new: reconciled.opened, fixed: reconciled.fixed, reopened: reconciled.reopened } },
+      warnings,
+    };
+  }
+
+  /**
+   * Runs the enabled scanners over a checkout and scores their findings, without storing anything. Pull request
+   * scans use this directly; `overrides` adjusts the scanning settings for one analysis.
+   */
+  async analyze(repo: Repository, workdir: string, allFiles: RepoFile[], log: (m: string) => void, overrides: Partial<ScanningSettings> = {}): Promise<PipelineAnalysis> {
     const warnings: string[] = [];
     const repoConfig = await this.loadRepoConfig(allFiles);
     for (const e of repoConfig.errors) warnings.push(e);
@@ -86,7 +146,7 @@ export class ScanPipeline {
     const files = allFiles.filter((f) => !ignored(f.path));
     if (files.length !== allFiles.length) log(`.argus.yml ignores ${allFiles.length - files.length} file(s)`);
 
-    const settings = await this.settings.getScanning();
+    const settings = { ...(await this.settings.getScanning()), ...overrides };
     const now = new Date();
     const rules = buildSuppressionRules(repo.id, await this.store.suppressions.listApplicable(repo.id, now), repoConfig, now);
     const enabled = SCANNERS.filter((s) => !repo.disabledScanners.includes(s) && repoConfig.scanners[s] !== false);
@@ -140,43 +200,7 @@ export class ScanPipeline {
       }
     }
 
-    const reconciled = await this.store.findings.reconcile({ repoId: repo.id, sourceId: repo.sourceId, teamId: repo.teamId, runId: run.id, scanners: completed, now }, observed);
-
-    // The inventory is only replaced when the dependency scan produced one, so a failed scan keeps the last good SBOM.
-    if (shared.inventory) {
-      const deps: Dependency[] = shared.inventory.map((d) => ({
-        repoId: repo.id,
-        teamId: repo.teamId,
-        ecosystem: d.ecosystem,
-        name: d.name,
-        version: d.version,
-        direct: d.direct,
-        dev: d.dev,
-        license: d.license,
-        manifestPath: d.manifestPath,
-        latestVersion: d.latestVersion,
-        deprecated: d.deprecated,
-        vulnerabilities: d.vulnerabilities,
-      }));
-      await this.store.dependencies.replaceForRepo(repo.id, deps);
-    }
-
-    // Tickets are opened, updated and resolved from the reconciled findings.
-    await this.events.emit('scan.completed', { repo, run });
-
-    // AI hints need the checkout, so they run before it is deleted. A failure never fails the scan.
-    try {
-      await this.triage.run(repo, files, secretValues, readText, log);
-    } catch (err) {
-      warnings.push(`AI triage failed: ${err instanceof Error ? err.message : String(err)}`);
-    }
-
-    const open = Object.fromEntries(SEVERITIES.map((s) => [s, 0])) as Record<Severity, number>;
-    for (const o of observed) if (!o.suppressionId) open[o.severity]++;
-    return {
-      stats: { dependencies: shared.inventory?.length, scanners: results, findings: { open, new: reconciled.opened, fixed: reconciled.fixed, reopened: reconciled.reopened } },
-      warnings,
-    };
+    return { observed, results, completed, warnings, shared, secretValues, files };
   }
 
   private async loadRepoConfig(files: RepoFile[]): Promise<RepoScanConfig> {

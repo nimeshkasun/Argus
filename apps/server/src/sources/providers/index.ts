@@ -6,7 +6,8 @@ import { ProviderError } from './http';
 import { type ProviderClient, type ProviderConnection, type WebhookEvent } from './types';
 
 export { ProviderError } from './http';
-export type { ConnectionCheck, ProviderClient, ProviderConnection, WebhookEvent } from './types';
+export type { ConnectionCheck, ProviderClient, ProviderConnection, PullRequestComment, PullRequestInfo, WebhookEvent } from './types';
+export { MAX_PR_FILES } from './types';
 
 export function createProviderClient(conn: ProviderConnection): ProviderClient {
   switch (conn.provider) {

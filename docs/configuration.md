@@ -21,7 +21,7 @@ Runtime policies (password rules, MFA, sessions) are set in the UI under **Admin
 | `ARGUS_DB_NAME` | from the URL, else `argus` | MongoDB database name. |
 | `ARGUS_ROLE` | `all` | `all` runs API, UI and worker. `api` runs HTTP only. `worker` runs background processing only. See [architecture](architecture.md#runtime-roles). |
 | `ARGUS_ADMIN_PASSWORD` | generated | Initial password for the default `admin` account. Used **only** when the database has no users. It must be changed at first sign-in. |
-| `ARGUS_PUBLIC_URL` | — | External URL, for example `https://argus.example.com`. Used for links in emails, notifications and Jira issues, and to enable `Secure` cookies and HSTS when it starts with `https://`. Required for [sign-in links by email](features/user-management.md#sign-in-links-by-email). |
+| `ARGUS_PUBLIC_URL` | — | External URL, for example `https://argus.example.com`. Used for links in emails, notifications, Jira issues and pull request comments, and to enable `Secure` cookies and HSTS when it starts with `https://`. Required for [sign-in links by email](features/user-management.md#sign-in-links-by-email). |
 | `ARGUS_COOKIE_SECURE` | `auto` | `auto` is secure when the public URL is HTTPS (or, without a public URL, when `NODE_ENV=production`). Can also be `true` or `false`. |
 | `ARGUS_TRUST_PROXY` | `1` | Express `trust proxy` setting, so client IPs are correct behind a load balancer or App Service front end. Accepts a hop count, `true`, `false`, or a subnet list. |
 | `ARGUS_AUTH_RATE_LIMIT` | `10` | Requests per minute per client IP for each credential endpoint (login, MFA verification, password change). Raise it if many users share one egress IP (corporate NAT). |

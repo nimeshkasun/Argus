@@ -19,8 +19,11 @@ import {
   type Job,
   type JobStatus,
   type NewJob,
+  type NewPrScan,
   type NewScanRun,
   type NewSource,
+  type PrScan,
+  type PrScanPatch,
   type Repository,
   type RepositoryListFilter,
   type RepositoryPatch,
@@ -144,6 +147,19 @@ export interface RepositoryRepo {
   update(id: string, patch: RepositoryPatch): Promise<Repository | null>;
   /** Active, not removed repositories whose nextScanAt is at or before `now`, oldest first. */
   findDue(now: Date, limit: number): Promise<Repository[]>;
+}
+
+export interface PrScanRepo {
+  create(input: NewPrScan): Promise<PrScan>;
+  findById(id: string): Promise<PrScan | null>;
+  update(id: string, patch: PrScanPatch): Promise<PrScan | null>;
+  /** A queued or running scan of this pull request at this commit, if any. */
+  findActive(repoId: string, number: number, headSha: string | null): Promise<PrScan | null>;
+  /** The newest scan of this pull request that posted a comment. */
+  findLastCommented(repoId: string, number: number): Promise<PrScan | null>;
+  /** Newest first. */
+  listForRepo(repoId: string, page: { offset: number; limit: number }): Promise<Page<PrScan>>;
+  deleteFinishedBefore(before: Date): Promise<number>;
 }
 
 export interface ScanRunRepo {
@@ -403,6 +419,7 @@ export interface DataStore {
   readonly sources: SourceRepo;
   readonly repositories: RepositoryRepo;
   readonly scanRuns: ScanRunRepo;
+  readonly prScans: PrScanRepo;
   readonly jobs: JobRepo;
   readonly locks: LockRepo;
   readonly findings: FindingRepo;

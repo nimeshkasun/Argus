@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { type Collection, type Db, type Filter, MongoClient, MongoServerError } from 'mongodb';
 import { DuplicateKeyError } from '../errors';
+import { bootstrapPrScanIndexes, MongoPrScanRepo, type PrScanDoc } from './pr-scans';
 import {
   type AuditEntry,
   type AuditFilter,
@@ -339,6 +340,7 @@ async function bootstrap(db: Db): Promise<void> {
     { key: { targetType: 1, targetId: 1 }, name: 'target' },
   ]);
   await bootstrapScanningIndexes(db);
+  await bootstrapPrScanIndexes(db);
   await bootstrapFindingIndexes(db);
   await bootstrapTicketIndexes(db);
   await bootstrapAiIndexes(db);
@@ -365,6 +367,7 @@ export async function createMongoStore(url: string, dbName?: string): Promise<Da
     sources: new MongoSourceRepo(db.collection<SourceDoc>('sources'), repositories, scanRuns, db),
     repositories: new MongoRepositoryRepo(repositories),
     scanRuns: new MongoScanRunRepo(scanRuns),
+    prScans: new MongoPrScanRepo(db.collection<PrScanDoc>('pr_scans')),
     jobs: new MongoJobRepo(db.collection<JobDoc>('jobs')),
     locks: new MongoLockRepo(db.collection<LockDoc>('locks')),
     findings: new MongoFindingRepo(db.collection<FindingDoc>('findings')),

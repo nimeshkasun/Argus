@@ -23,6 +23,8 @@ API tokens are **default-deny**. They work only on endpoints that declare the pe
 
 Token requests carry no cookies, so CSRF protection does not apply to them.
 
+To scan pull requests from a CI pipeline, use a token with the **CI pull request scans** preset: see [Pull request scans](pull-request-scans.md).
+
 ## OpenAPI
 
 `GET /api/v1/openapi.json` returns an OpenAPI 3.1 description of the REST API, generated from the running code. To read it in Argus, open **Documentation → API reference**. It lists every endpoint by area, with its method, path, required permissions, parameters and JSON body, and you can filter it. For every endpoint it gives:

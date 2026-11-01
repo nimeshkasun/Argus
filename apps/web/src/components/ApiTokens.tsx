@@ -1,4 +1,4 @@
-import { API_TOKEN_LIFETIMES_DAYS, type ApiTokenCreatedDto, type ApiTokenDto, type Permission, READ_ONLY_SCOPES } from '@argus/shared';
+import { API_TOKEN_LIFETIMES_DAYS, type ApiTokenCreatedDto, type ApiTokenDto, CI_PR_SCAN_SCOPES, type Permission, READ_ONLY_SCOPES } from '@argus/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { KeyRound, Plus } from 'lucide-react';
 import { type FormEvent, useState } from 'react';
@@ -84,9 +84,16 @@ function CreateTokenModal({ onClose }: { onClose(): void }) {
         <div>
           <div className="mb-2 flex items-center justify-between">
             <span className="text-sm font-medium">Scopes</span>
-            <Button type="button" size="sm" variant="ghost" onClick={() => setScopes(READ_ONLY_SCOPES.filter((s) => held.includes(s)))}>
-              Read-only preset
-            </Button>
+            <div className="flex gap-1">
+              <Button type="button" size="sm" variant="ghost" onClick={() => setScopes(READ_ONLY_SCOPES.filter((s) => held.includes(s)))}>
+                Read-only preset
+              </Button>
+              {CI_PR_SCAN_SCOPES.every((s) => held.includes(s)) && (
+                <Button type="button" size="sm" variant="ghost" title="Just enough to request pull request scans from a CI pipeline" onClick={() => setScopes([...CI_PR_SCAN_SCOPES])}>
+                  CI pull request scans
+                </Button>
+              )}
+            </div>
           </div>
           <div className="grid gap-2 sm:grid-cols-3">
             {held.map((p) => (

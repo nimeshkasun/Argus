@@ -1,7 +1,7 @@
 import { createHash, createPrivateKey, type KeyObject, sign } from 'node:crypto';
 import { type DiscoveredRepo, type Visibility } from '@argus/data';
 import { getJson, normalizeBaseUrl, ProviderError, requestJson } from './http';
-import { type ConnectionCheck, MAX_PAGES, type ProviderClient, type ProviderConnection } from './types';
+import { type ConnectionCheck, MAX_PAGES, MAX_PR_FILES, type ProviderClient, type ProviderConnection, type PullRequestComment, type PullRequestInfo } from './types';
 
 interface GhRepo {
   id: number;
@@ -82,8 +82,14 @@ export class GitHubClient implements ProviderClient {
     return `${this.api.toString().replace(/\/+$/, '')}${path}`;
   }
 
-  private request<T>(url: string, bearer: string, method: 'GET' | 'POST' = 'GET') {
-    return requestJson<T>(url, { method, headers: { Authorization: `Bearer ${bearer}`, ...API_HEADERS }, allowedOrigin: this.api.origin, providerName: NAME });
+  private request<T>(url: string, bearer: string, method: 'GET' | 'POST' | 'PATCH' = 'GET', body?: unknown) {
+    return requestJson<T>(url, { method, body, headers: { Authorization: `Bearer ${bearer}`, ...API_HEADERS }, allowedOrigin: this.api.origin, providerName: NAME });
+  }
+
+  /** "/repos/owner/name" for an "owner/name" full name. */
+  private repoPath(fullName: string): string {
+    const [owner, name] = fullName.split('/');
+    return `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name ?? '')}`;
   }
 
   private async get<T>(url: string) {
@@ -198,6 +204,40 @@ export class GitHubClient implements ProviderClient {
 
   async gitAuthHeader(): Promise<string> {
     return `Authorization: Basic ${Buffer.from(`x-access-token:${await this.accessToken()}`).toString('base64')}`;
+  }
+
+  async pullRequest(fullName: string, number: number): Promise<PullRequestInfo> {
+    type GhPull = { title: string; html_url: string; state: string; merged_at: string | null; head: { sha: string; ref: string }; base: { ref: string } };
+    const { data } = await this.get<GhPull>(this.url(`${this.repoPath(fullName)}/pulls/${number}`));
+    // GitHub keeps every pull request's head (also from forks) under refs/pull/<n>/head of the base repository.
+    return { number, title: data.title, url: data.html_url, state: data.merged_at ? 'merged' : data.state, headSha: data.head.sha, headBranch: data.head.ref, baseBranch: data.base.ref, fetch: { cloneUrl: null, ref: `refs/pull/${number}/head` } };
+  }
+
+  async pullRequestFiles(fullName: string, number: number): Promise<string[]> {
+    let url: string | null = this.url(`${this.repoPath(fullName)}/pulls/${number}/files?per_page=100`);
+    const out: string[] = [];
+    for (let page = 0; url && out.length < MAX_PR_FILES && page < 100; page++) {
+      const res: { data: { filename: string; status: string }[]; headers: Headers } = await this.get<{ filename: string; status: string }[]>(url);
+      for (const f of res.data) if (f.status !== 'removed') out.push(f.filename);
+      url = nextLink(res.headers.get('link'));
+    }
+    return out;
+  }
+
+  async upsertPullRequestComment(fullName: string, number: number, body: string, existing: string | null): Promise<PullRequestComment> {
+    const token = await this.accessToken();
+    // Pull request conversation comments are issue comments.
+    if (existing && /^\d+$/.test(existing)) {
+      try {
+        const { data } = await this.request<{ id: number; html_url: string }>(this.url(`${this.repoPath(fullName)}/issues/comments/${existing}`), token, 'PATCH', { body });
+        return { id: String(data.id), url: data.html_url };
+      } catch (err) {
+        // Someone deleted it: post a new one.
+        if (!(err instanceof ProviderError && err.status === 404)) throw err;
+      }
+    }
+    const { data } = await this.request<{ id: number; html_url: string }>(this.url(`${this.repoPath(fullName)}/issues/${number}/comments`), token, 'POST', { body });
+    return { id: String(data.id), url: data.html_url };
   }
 
   allowedCloneHosts(): string[] {

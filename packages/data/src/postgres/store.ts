@@ -24,6 +24,7 @@ import { migrationProvider } from './migrations';
 import { PgCacheRepo, PgDependencyRepo, PgFindingRepo, PgSuppressionRepo } from './findings';
 import { PgChannelRepo, PgCounterRepo, PgNotificationRuleRepo, PgTicketRepo } from './tickets';
 import { PgAiInsightRepo, PgAiUsageRepo } from './ai';
+import { PgPrScanRepo } from './pr-scans';
 import { PgApiTokenRepo, PgCredentialRepo, PgInviteRepo, PgLoginLinkRepo, PgSavedViewRepo } from './platform';
 import { PgAdvisoryRepo, PgIntelItemRepo, PgIntelSourceRepo } from './intel';
 import { PgJobRepo, PgLockRepo, PgRepositoryRepo, PgScanRunRepo, PgSourceRepo } from './scanning';
@@ -385,6 +386,7 @@ export function createPostgresStore(url: string): DataStore {
     sources: new PgSourceRepo(db),
     repositories: new PgRepositoryRepo(db),
     scanRuns: new PgScanRunRepo(db),
+    prScans: new PgPrScanRepo(db),
     jobs: new PgJobRepo(db),
     locks: new PgLockRepo(db),
     findings: new PgFindingRepo(db),

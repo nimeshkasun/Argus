@@ -191,6 +191,40 @@ export function scanningContract(getStore: () => DataStore): void {
     });
   });
 
+  describe('pull request scans', () => {
+    it('creates, de-duplicates active scans, remembers comments, lists and expires', async () => {
+      const store = getStore();
+      const s = await store.sources.create(newSource());
+      await store.repositories.syncFromSource(s.id, [discovered(1)], defaults());
+      const repo = (await store.repositories.findByExternalId(s.id, '1'))!;
+      const base = { repoId: repo.id, sourceId: s.id, number: 7, title: 'Add login', url: 'https://github.com/acme/repo-1/pull/7', headBranch: 'feature', baseBranch: 'main', failOn: 'high' as const, comment: true, requestedBy: null };
+
+      const a = await store.prScans.create({ ...base, headSha: 'aaa' });
+      expect(a).toMatchObject({ status: 'queued', result: null, log: [], commentId: null, startedAt: null });
+      expect((await store.prScans.findActive(repo.id, 7, 'aaa'))?.id).toBe(a.id);
+      expect(await store.prScans.findActive(repo.id, 7, 'bbb')).toBeNull();
+      expect(await store.prScans.findActive(repo.id, 8, 'aaa')).toBeNull();
+
+      const result = { gate: 'failed' as const, changedFiles: 2, counts: { critical: 0, high: 1, medium: 0, low: 0, info: 0 }, findings: [], truncated: false, existingInChangedFiles: 0, suppressed: 0, scanners: [], commentError: null };
+      const done = await store.prScans.update(a.id, { status: 'succeeded', result, commentId: '123', commentUrl: 'https://github.com/x#c', log: ['done'], finishedAt: new Date() });
+      expect(done).toMatchObject({ status: 'succeeded', result: { gate: 'failed', counts: { high: 1 } }, commentId: '123', log: ['done'] });
+      expect(await store.prScans.findActive(repo.id, 7, 'aaa')).toBeNull();
+
+      const b = await store.prScans.create({ ...base, headSha: 'bbb' });
+      expect((await store.prScans.findLastCommented(repo.id, 7))?.id).toBe(a.id);
+      expect(await store.prScans.findLastCommented(repo.id, 8)).toBeNull();
+
+      const page = await store.prScans.listForRepo(repo.id, { offset: 0, limit: 10 });
+      expect(page.total).toBe(2);
+      expect(page.items.map((p) => p.id)).toEqual([b.id, a.id]);
+
+      // Only finished scans expire.
+      expect(await store.prScans.deleteFinishedBefore(new Date(Date.now() + 60_000))).toBe(1);
+      expect(await store.prScans.findById(a.id)).toBeNull();
+      expect(await store.prScans.findById(b.id)).not.toBeNull();
+    });
+  });
+
   describe('jobs', () => {
     const type = () => `test.${Math.random().toString(36).slice(2, 8)}`;
 
