@@ -1,3 +1,4 @@
+import { type PrScanResult } from '@argus/shared';
 import { type ColumnType } from 'kysely';
 
 /** jsonb columns: read as parsed JSON, written as a JSON string (node-postgres would mangle JS arrays). */
@@ -144,6 +145,30 @@ export interface ScanRunsTable {
   error: string | null;
   stats: Json<{ files: number; bytes: number; ecosystems: string[]; manifests: string[] } | null> | null;
   log: Json<string[]>;
+}
+
+export interface PrScansTable {
+  id: string;
+  repoId: string;
+  sourceId: string;
+  number: number;
+  title: string | null;
+  url: string | null;
+  headSha: string | null;
+  headBranch: string | null;
+  baseBranch: string | null;
+  status: string;
+  failOn: string;
+  comment: boolean;
+  requestedBy: string | null;
+  result: Json<PrScanResult | null> | null;
+  commentId: string | null;
+  commentUrl: string | null;
+  error: string | null;
+  log: Json<string[]>;
+  createdAt: Date;
+  startedAt: Date | null;
+  finishedAt: Date | null;
 }
 
 export interface JobsTable {
@@ -481,6 +506,7 @@ export interface Database {
   sources: SourcesTable;
   repositories: RepositoriesTable;
   scanRuns: ScanRunsTable;
+  prScans: PrScansTable;
   jobs: JobsTable;
   locks: LocksTable;
   findings: FindingsTable;

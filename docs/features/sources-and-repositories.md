@@ -31,7 +31,7 @@ Argus only reads code, so give it read-only credentials.
 
 | Provider | Recommended credential | Minimum permissions |
 |---|---|---|
-| GitHub | Fine-grained personal access token (or a token for a dedicated machine user) | Repository access to the repositories to monitor, with **Contents: read** and **Metadata: read**. A classic token needs the `repo` scope. |
+| GitHub | Fine-grained personal access token (or a token for a dedicated machine user) | Repository access to the repositories to monitor, with **Contents: read** and **Metadata: read**. A classic token needs the `repo` scope. For [pull request scans](pull-request-scans.md) to comment, add **Pull requests: Read and write**. |
 | Bitbucket Cloud | Workspace access token | **Repositories: read** |
 | Bitbucket Data Center | HTTP access token (project- or user-level) | **Project read** or **Repository read** |
 
@@ -39,7 +39,7 @@ Argus only reads code, so give it read-only credentials.
 
 For organisations, a GitHub App is often preferable: it is not tied to a person, repository access is chosen when it is installed, and Argus only ever holds tokens that expire within an hour.
 
-1. In GitHub, create an app (**Settings → Developer settings → GitHub Apps → New GitHub App**). Give it the repository permissions **Contents: read** and **Metadata: read**. It needs no other permissions or events.
+1. In GitHub, create an app (**Settings → Developer settings → GitHub Apps → New GitHub App**). Give it the repository permissions **Contents: read** and **Metadata: read**. It needs no other permissions or events, except **Pull requests: Read and write** if [pull request scans](pull-request-scans.md) should comment.
 2. Generate a **private key** on the app's settings page and download the `.pem` file.
 3. **Install** the app on the organisation (or user account), for all repositories or selected ones.
 4. In Argus, add a GitHub source, choose **Authentication → GitHub App**, and enter:

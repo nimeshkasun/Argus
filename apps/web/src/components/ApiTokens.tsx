@@ -1,11 +1,11 @@
-import { API_TOKEN_LIFETIMES_DAYS, type ApiTokenCreatedDto, type ApiTokenDto, type Permission, READ_ONLY_SCOPES } from '@argus/shared';
+import { API_TOKEN_LIFETIMES_DAYS, type ApiTokenCreatedDto, type ApiTokenDto, CI_PR_SCAN_SCOPES, type Permission, READ_ONLY_SCOPES } from '@argus/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { KeyRound, Plus } from 'lucide-react';
 import { type FormEvent, useState } from 'react';
 import { toast } from 'sonner';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
-import { formatDateTime, formatRelative } from '../lib/utils';
+import { formatDate, formatDateTime, formatRelative } from '../lib/utils';
 import { SecretReveal } from './SecretReveal';
 import { Badge, Button, Card, CardHeader, Checkbox, ErrorAlert, Field, Input, Modal, Select, Table } from './ui';
 
@@ -84,9 +84,16 @@ function CreateTokenModal({ onClose }: { onClose(): void }) {
         <div>
           <div className="mb-2 flex items-center justify-between">
             <span className="text-sm font-medium">Scopes</span>
-            <Button type="button" size="sm" variant="ghost" onClick={() => setScopes(READ_ONLY_SCOPES.filter((s) => held.includes(s)))}>
-              Read-only preset
-            </Button>
+            <div className="flex gap-1">
+              <Button type="button" size="sm" variant="ghost" onClick={() => setScopes(READ_ONLY_SCOPES.filter((s) => held.includes(s)))}>
+                Read-only preset
+              </Button>
+              {CI_PR_SCAN_SCOPES.every((s) => held.includes(s)) && (
+                <Button type="button" size="sm" variant="ghost" title="Just enough to request pull request scans from a CI pipeline" onClick={() => setScopes([...CI_PR_SCAN_SCOPES])}>
+                  CI pull request scans
+                </Button>
+              )}
+            </div>
           </div>
           <div className="grid gap-2 sm:grid-cols-3">
             {held.map((p) => (
@@ -143,7 +150,7 @@ export function ApiTokensCard({ all = false }: { all?: boolean }) {
               <td className="px-4 py-2 text-sm" title={t.lastUsedIp ?? undefined}>
                 {t.lastUsedAt ? formatRelative(t.lastUsedAt) : 'Never'}
               </td>
-              <td className="px-4 py-2 text-sm">{formatDateTime(t.expiresAt).slice(0, 10)}</td>
+              <td className="px-4 py-2 text-sm whitespace-nowrap" title={formatDateTime(t.expiresAt)}>{formatDate(t.expiresAt)}</td>
               <td className="px-4 py-2">{status(t)}</td>
               <td className="px-4 py-2 text-right">
                 {!t.revokedAt && (

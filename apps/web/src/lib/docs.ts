@@ -33,6 +33,7 @@ const SECTIONS: { title: string; slugs: string[] }[] = [
       'features/user-management',
       'features/sources-and-repositories',
       'features/scanners-and-findings',
+      'features/pull-request-scans',
       'features/tickets-and-notifications',
       'features/ai-assistance',
       'features/threat-intelligence',

@@ -18,11 +18,12 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, ExternalLink, History, Play } from 'lucide-react';
 import { type FormEvent, useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router';
+import { Link, useParams, useSearchParams } from 'react-router';
 import { toast } from 'sonner';
 import { DependenciesTable } from '../components/DependenciesTable';
 import { SeverityBadge } from '../components/findings';
 import { FindingsTable } from '../components/FindingsTable';
+import { PullRequestScansTab } from '../components/PullRequestScans';
 import { formatDuration, isActiveScan, ScanRunModal, ScanStatusBadge, TRIGGER_LABELS } from '../components/scans';
 import { Badge, Button, Card, CardHeader, CenteredSpinner, Checkbox, EmptyState, ErrorAlert, Field, Input, Pagination, Select, Table } from '../components/ui';
 import { api } from '../lib/api';
@@ -205,7 +206,11 @@ export function RepositoryDetailPage() {
   const qc = useQueryClient();
   const [runsPage, setRunsPage] = useState(1);
   const [openRun, setOpenRun] = useState<string | null>(null);
-  const [tab, setTab] = useState<'findings' | 'dependencies' | 'history'>('findings');
+  // ?tab=pull-requests&scan=<id> is the link Argus puts in pull request comments.
+  const [params, setParams] = useSearchParams();
+  const tab = (['findings', 'dependencies', 'history', 'pull-requests'] as const).find((t) => t === params.get('tab')) ?? 'findings';
+  const setTab = (t: typeof tab) => setParams(t === 'findings' ? {} : { tab: t }, { replace: true });
+  const openPrScan = params.get('scan');
   const summary = useQuery({ queryKey: ['findings', 'summary', id], queryFn: () => api<FindingSummary>('/findings/summary', { query: { repoId: id } }) });
 
   const repo = useQuery({
@@ -308,6 +313,7 @@ export function RepositoryDetailPage() {
                 ['findings', 'Findings'],
                 ['dependencies', 'Dependencies'],
                 ['history', 'Scan history'],
+                ['pull-requests', 'Pull requests'],
               ] as const
             ).map(([key, label]) => (
               <button
@@ -323,6 +329,7 @@ export function RepositoryDetailPage() {
           </div>
           {tab === 'findings' && <FindingsTable repoId={r.id} />}
           {tab === 'dependencies' && <DependenciesTable repoId={r.id} />}
+          {tab === 'pull-requests' && <PullRequestScansTab repo={r} openScanId={openPrScan} onOpenScan={(scan) => setParams(scan ? { tab: 'pull-requests', scan } : { tab: 'pull-requests' }, { replace: true })} />}
           {tab === 'history' && (
             <>
               <p className="px-5 pt-3 text-xs text-slate-500">Scan runs are kept for 90 days.</p>

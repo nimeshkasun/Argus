@@ -65,16 +65,31 @@ export function getJson<T>(url: string, opts: { headers: Record<string, string>;
   return requestJson<T>(url, opts);
 }
 
-/** Like getJson, for the few calls that are not GETs (e.g. minting a GitHub App installation token). */
-export async function requestJson<T>(url: string, opts: { method?: 'GET' | 'POST'; headers: Record<string, string>; allowedOrigin: string; providerName: string }): Promise<JsonResponse<T>> {
-  const target = new URL(url);
-  if (target.origin !== opts.allowedOrigin) throw new ProviderError(`Refusing to call ${target.origin}: it is not the configured ${opts.providerName} server.`, null, true);
+/** Like getJson, for calls that are not GETs (minting a GitHub App installation token, pull request comments). */
+export async function requestJson<T>(url: string, opts: { method?: 'GET' | 'POST' | 'PUT' | 'PATCH'; body?: unknown; headers: Record<string, string>; allowedOrigin: string; providerName: string }): Promise<JsonResponse<T>> {
+  let target = new URL(url);
   let res: Response;
-  try {
-    res = await fetch(target, { method: opts.method ?? 'GET', headers: { Accept: 'application/json', 'User-Agent': 'Argus', ...opts.headers }, redirect: 'error', signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
-  } catch (err) {
-    const cause = err instanceof Error ? ((err.cause as Error | undefined)?.message ?? err.message) : String(err);
-    throw new ProviderError(`Could not reach ${target.host}: ${cause}`);
+  // Redirects are followed by hand, and only on the same origin, so credentials never go anywhere else
+  // (Bitbucket answers some pull request endpoints with a redirect to the repository's equivalent).
+  for (let hop = 0; ; hop++) {
+    if (target.origin !== opts.allowedOrigin) throw new ProviderError(`Refusing to call ${target.origin}: it is not the configured ${opts.providerName} server.`, null, true);
+    try {
+      res = await fetch(target, {
+        method: opts.method ?? 'GET',
+        headers: { Accept: 'application/json', 'User-Agent': 'Argus', ...(opts.body !== undefined ? { 'Content-Type': 'application/json' } : {}), ...opts.headers },
+        body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
+        redirect: 'manual',
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      });
+    } catch (err) {
+      const cause = err instanceof Error ? ((err.cause as Error | undefined)?.message ?? err.message) : String(err);
+      throw new ProviderError(`Could not reach ${target.host}: ${cause}`);
+    }
+    const location = res.status >= 300 && res.status < 400 ? res.headers.get('location') : null;
+    if (!location) break;
+    await res.body?.cancel().catch(() => undefined);
+    if (hop >= 3 || (opts.method ?? 'GET') !== 'GET') throw new ProviderError(`${opts.providerName} redirected the request unexpectedly. Check the server URL.`, res.status, true);
+    target = new URL(location, target);
   }
   if (!res.ok) {
     await res.body?.cancel().catch(() => undefined);

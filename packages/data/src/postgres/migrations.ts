@@ -618,6 +618,38 @@ migrations['0012_login_links'] = {
   },
 };
 
+migrations['0013_pr_scans'] = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async up(db: Kysely<any>) {
+    await db.schema
+      .createTable('pr_scans')
+      .addColumn('id', 'uuid', (c) => c.primaryKey())
+      .addColumn('repo_id', 'uuid', (c) => c.notNull().references('repositories.id').onDelete('cascade'))
+      .addColumn('source_id', 'uuid', (c) => c.notNull().references('sources.id').onDelete('cascade'))
+      .addColumn('number', 'integer', (c) => c.notNull())
+      .addColumn('title', 'text')
+      .addColumn('url', 'text')
+      .addColumn('head_sha', 'text')
+      .addColumn('head_branch', 'text')
+      .addColumn('base_branch', 'text')
+      .addColumn('status', 'text', (c) => c.notNull())
+      .addColumn('fail_on', 'text', (c) => c.notNull())
+      .addColumn('comment', 'boolean', (c) => c.notNull())
+      .addColumn('requested_by', 'uuid', (c) => c.references('users.id').onDelete('set null'))
+      .addColumn('result', 'jsonb')
+      .addColumn('comment_id', 'text')
+      .addColumn('comment_url', 'text')
+      .addColumn('error', 'text')
+      .addColumn('log', 'jsonb', (c) => c.notNull())
+      .addColumn('created_at', 'timestamptz', (c) => c.notNull())
+      .addColumn('started_at', 'timestamptz')
+      .addColumn('finished_at', 'timestamptz')
+      .execute();
+    await db.schema.createIndex('pr_scans_repo_number_idx').on('pr_scans').columns(['repo_id', 'number', 'created_at']).execute();
+    await db.schema.createIndex('pr_scans_repo_created_idx').on('pr_scans').columns(['repo_id', 'created_at']).execute();
+  },
+};
+
 export const migrationProvider: MigrationProvider = {
   async getMigrations() {
     return migrations;

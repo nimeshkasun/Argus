@@ -6,6 +6,7 @@ Argus can use a large language model to help people act on findings faster:
 - **Jira and email drafting**: fills in the Jira issue or email form from the ticket, for you to edit before sending.
 - **Secret triage** during scans: flags detected secrets that look like test fixtures, documentation examples or placeholders.
 - **Vulnerability applicability** during scans: judges, from how the code uses a vulnerable package, whether the repository is likely affected.
+- **Pull request fix suggestions:** during [pull request scans](pull-request-scans.md), suggests a code change for new code and infrastructure issues, shown in the pull request comment for review. Off by default.
 - **Advisory extraction** from security news: proposes package advisories for review — see [Threat intelligence](threat-intelligence.md).
 
 AI only ever **advises**. It never changes a ticket's status, suppresses a finding or alters a risk score. Every AI output is labelled *AI-assisted*, with the model that produced it and its reasoning.

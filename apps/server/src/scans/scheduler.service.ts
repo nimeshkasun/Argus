@@ -102,6 +102,7 @@ export class SchedulerService implements OnApplicationBootstrap, OnApplicationSh
     // Data retention (Administration → Scanning settings).
     const removed = {
       scanRuns: await this.store.scanRuns.deleteFinishedBefore(ago(r.scanRunsDays)),
+      prScans: await this.store.prScans.deleteFinishedBefore(ago(r.scanRunsDays)),
       fixedFindings: r.fixedFindingsDays === null ? 0 : await this.store.findings.deleteFixedBefore(ago(r.fixedFindingsDays)),
       auditEntries: r.auditDays === null ? 0 : await this.store.audit.deleteBefore(ago(r.auditDays)),
       intelItems: await this.store.intelItems.deleteSettledBefore(ago(r.intelItemsDays)),

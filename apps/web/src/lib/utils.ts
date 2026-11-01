@@ -6,10 +6,15 @@ export function cn(...inputs: ClassValue[]): string {
 }
 
 const dateTime = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+const dateOnly = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' });
 const relative = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' });
 
 export function formatDateTime(iso: string | null | undefined): string {
   return iso ? dateTime.format(new Date(iso)) : '—';
+}
+
+export function formatDate(iso: string | null | undefined): string {
+  return iso ? dateOnly.format(new Date(iso)) : '—';
 }
 
 export function formatRelative(iso: string | null | undefined): string {

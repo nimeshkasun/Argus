@@ -9,6 +9,7 @@ This documentation is also built into Argus: choose **Documentation** at the bot
   - [User management](features/user-management.md)
   - [Sources, repositories and scans](features/sources-and-repositories.md)
   - [Scanners, findings and risk scoring](features/scanners-and-findings.md)
+  - [Pull request scans](features/pull-request-scans.md)
   - [Tickets, email, Jira and notifications](features/tickets-and-notifications.md)
   - [AI assistance](features/ai-assistance.md)
   - [Threat intelligence](features/threat-intelligence.md)

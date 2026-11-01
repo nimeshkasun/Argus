@@ -50,6 +50,8 @@ See [Sources, repositories and scans](sources-and-repositories.md).
 | License compliance policy: not allowed, needs review and always-allowed licenses, an allow-list-only mode, and approved packages (also from a finding) | ✅ |
 | NuGet license data (from package .nuspec files) | ✅ |
 | CycloneDX SBOM per repository; organisation-wide package search | ✅ |
+| **Pull request scans from CI** (GitHub Actions, Bitbucket Pipelines, any CI): only issues the pull request introduces, a severity gate for the build, and one self-updating comment on the pull request with fixes — see [Pull request scans](pull-request-scans.md) | ✅ |
+| AI fix suggestions on pull request comments (opt-in) | ✅ |
 | Credential inventory (tracked secrets with expiry notices; Microsoft Entra ID app secrets and certificates imported daily) — see [Dashboards, reports and credentials](dashboards-and-reports.md#credential-inventory) | ✅ |
 
 ## Risk & tickets
