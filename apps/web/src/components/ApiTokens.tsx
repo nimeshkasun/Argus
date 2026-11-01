@@ -5,7 +5,7 @@ import { type FormEvent, useState } from 'react';
 import { toast } from 'sonner';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
-import { formatDateTime, formatRelative } from '../lib/utils';
+import { formatDate, formatDateTime, formatRelative } from '../lib/utils';
 import { SecretReveal } from './SecretReveal';
 import { Badge, Button, Card, CardHeader, Checkbox, ErrorAlert, Field, Input, Modal, Select, Table } from './ui';
 
@@ -150,7 +150,7 @@ export function ApiTokensCard({ all = false }: { all?: boolean }) {
               <td className="px-4 py-2 text-sm" title={t.lastUsedIp ?? undefined}>
                 {t.lastUsedAt ? formatRelative(t.lastUsedAt) : 'Never'}
               </td>
-              <td className="px-4 py-2 text-sm">{formatDateTime(t.expiresAt).slice(0, 10)}</td>
+              <td className="px-4 py-2 text-sm whitespace-nowrap" title={formatDateTime(t.expiresAt)}>{formatDate(t.expiresAt)}</td>
               <td className="px-4 py-2">{status(t)}</td>
               <td className="px-4 py-2 text-right">
                 {!t.revokedAt && (
