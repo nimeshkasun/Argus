@@ -1,8 +1,10 @@
-import { type PrFindingDto, type PrScanFailOn, type PrScanResult, SCANNER_LABELS, type Severity, SEVERITIES } from '@argus/shared';
+import { type PrFindingDto, type PrReviewDto, type PrScanFailOn, type PrScanResult, SCANNER_LABELS, type Severity, SEVERITIES } from '@argus/shared';
 
 /** Comment size limit that every provider accepts (Bitbucket's is the smallest). */
 export const MAX_COMMENT_CHARS = 30_000;
 const OPEN_DETAILS = 5;
+/** Most of the comment the AI code review may take. */
+const MAX_REVIEW_CHARS = 12_000;
 
 const SEVERITY_ICON: Record<Severity, string> = { critical: '🔴', high: '🟠', medium: '🟡', low: '🔵', info: '⚪' };
 const label = (s: string) => s[0].toUpperCase() + s.slice(1);
@@ -63,6 +65,29 @@ export interface CommentContext {
   argusUrl: string | null;
 }
 
+const REVIEW_ICON = { issue: '🔴', suggestion: '🟡', nitpick: '⚪' } as const;
+const CATEGORY_LABEL = { bug: 'bug', security: 'security', error_handling: 'error handling', performance: 'performance', maintainability: 'maintainability', tests: 'tests', other: 'other' } as const;
+
+/** The AI code review: advisory remarks, clearly labelled, each linked to its line. */
+function reviewSection(r: PrReviewDto, ctx: CommentContext, html: boolean): string {
+  const lines = r.comments.map((c) => {
+    const link = fileLink(ctx.provider, ctx.repoUrl, ctx.headSha, c.path, c.line);
+    const where = code(`${c.path}:${c.line}`);
+    return `- ${REVIEW_ICON[c.severity]} **${label(c.severity)}** · ${link ? `[${where}](${link})` : where} · ${CATEGORY_LABEL[c.category]}: ${escapeMarkdown(c.comment)}`;
+  });
+  const skipped = r.filesSkipped ? ` ${r.filesSkipped} file${r.filesSkipped === 1 ? ' was' : 's were'} not reviewed (generated, lock files, binary or too large).` : '';
+  const body = [
+    `_AI-assisted review by ${escapeMarkdown(r.model)}. It can be wrong: use your judgement. It does not affect the gate._`,
+    escapeMarkdown(r.summary),
+    lines.length ? lines.join('\n') : 'No remarks.',
+    skipped ? `_${skipped.trim()}_` : null,
+  ]
+    .filter(Boolean)
+    .join('\n\n');
+  const title = `🤖 AI code review${r.comments.length ? ` (${r.comments.length} remark${r.comments.length === 1 ? '' : 's'})` : ''}`;
+  return html ? `<details open>\n<summary><b>${title}</b></summary>\n\n${body}\n\n</details>` : `### ${title}\n${body}`;
+}
+
 function findingBlock(f: PrFindingDto, ctx: CommentContext, html: boolean, open: boolean): string {
   const where = f.path ? `${f.path}${f.line ? `:${f.line}` : ''}` : null;
   const link = f.path ? fileLink(ctx.provider, ctx.repoUrl, ctx.headSha, f.path, f.line) : null;
@@ -114,9 +139,13 @@ export function renderPrComment(result: PrScanResult, ctx: CommentContext): stri
   if (notes.length) tail.push(notes.map((n) => `> ${n}`).join('\n>\n'));
   tail.push(`${html ? '<sub>' : '_'}Posted by Argus. This comment is updated each time the pull request is scanned.${html ? '</sub>' : '_'}`);
 
+  // The AI review has a bounded size, so it is sized first; findings then fill what is left.
+  let reviewText = result.review ? reviewSection(result.review, ctx, html) : null;
+  if (reviewText && reviewText.length > MAX_REVIEW_CHARS) reviewText = `${reviewText.slice(0, MAX_REVIEW_CHARS)}\n\n_…review shortened._${html ? '\n\n</details>' : ''}`;
+
   // Add findings until the comment would be too long; the rest are counted and left to Argus.
   const blocks: string[] = [];
-  let length = [...head, ...tail].join('\n\n').length + 200;
+  let length = [...head, ...tail].join('\n\n').length + (reviewText?.length ?? 0) + 200;
   let shown = 0;
   for (const [i, f] of result.findings.entries()) {
     const block = findingBlock(f, ctx, html, i < OPEN_DETAILS);
@@ -130,5 +159,5 @@ export function renderPrComment(result: PrScanResult, ctx: CommentContext): stri
   if (blocks.length) list.push('### New issues', ...blocks);
   if (hidden > 0) list.push(`_…and ${hidden} more${ctx.argusUrl ? ` — [see all in Argus](${ctx.argusUrl})` : ' in Argus'}._`);
 
-  return [...head, ...list, ...tail].join('\n\n');
+  return [...head, ...list, ...(reviewText ? [reviewText] : []), ...tail].join('\n\n');
 }

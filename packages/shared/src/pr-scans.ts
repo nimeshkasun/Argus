@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { type PR_REVIEW_CATEGORIES, type PR_REVIEW_SEVERITIES } from './ai';
 import { type ScannerName, type Severity } from './findings';
 import { type Permission } from './permissions';
 import { pageFields } from './schemas';
@@ -42,6 +43,26 @@ export interface PrFixSuggestion {
   model: string;
 }
 
+/** One remark from the AI code review, anchored to a line of the new version of a file. */
+export interface PrReviewCommentDto {
+  path: string;
+  line: number;
+  category: (typeof PR_REVIEW_CATEGORIES)[number];
+  severity: (typeof PR_REVIEW_SEVERITIES)[number];
+  comment: string;
+}
+
+/** The AI code review of a pull request: advisory, labelled with the model that wrote it, never part of the gate. */
+export interface PrReviewDto {
+  summary: string;
+  comments: PrReviewCommentDto[];
+  filesReviewed: number;
+  /** Changed files left out (too large, generated, lock files, binary, or over the context limit). */
+  filesSkipped: number;
+  provider: string;
+  model: string;
+}
+
 export interface PrFindingDto {
   scanner: ScannerName;
   ruleId: string;
@@ -74,6 +95,8 @@ export interface PrScanResult {
   scanners: ScannerRunResult[];
   /** Why the comment could not be posted, if it could not. */
   commentError: string | null;
+  /** AI code review, when that feature is on and ran. Absent on scans made before it existed. */
+  review?: PrReviewDto | null;
 }
 
 export interface PrScanDto {

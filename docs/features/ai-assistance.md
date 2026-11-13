@@ -7,6 +7,7 @@ Argus can use a large language model to help people act on findings faster:
 - **Secret triage** during scans: flags detected secrets that look like test fixtures, documentation examples or placeholders.
 - **Vulnerability applicability** during scans: judges, from how the code uses a vulnerable package, whether the repository is likely affected.
 - **Pull request fix suggestions:** during [pull request scans](pull-request-scans.md), suggests a code change for new code and infrastructure issues, shown in the pull request comment for review. Off by default.
+- **Pull request code review:** during [pull request scans](pull-request-scans.md), reviews the changes for bugs, risky logic, error handling and missing tests, and adds the remarks to the pull request comment. Advisory only; off by default.
 - **Advisory extraction** from security news: proposes package advisories for review — see [Threat intelligence](threat-intelligence.md).
 
 AI only ever **advises**. It never changes a ticket's status, suppresses a finding or alters a risk score. Every AI output is labelled *AI-assisted*, with the model that produced it and its reasoning.
@@ -56,6 +57,8 @@ Each feature can be switched on or off independently:
 | Jira and email drafting | **Draft with AI** in the Jira and email dialogs | Same, and the user must be able to work on tickets | Not stored. The text is only filled into the form. |
 | Secret triage | During scans, for new secret findings (default off) | Automatic | A hint on the finding: *likely a real secret*, *likely a false positive* or *uncertain*, with confidence and reasoning. |
 | Vulnerability applicability | During scans, for new medium, high and critical package vulnerabilities (default off) | Automatic | A hint on the finding: *likely affected*, *likely not affected* or *uncertain*. |
+| Pull request fix suggestions | During pull request scans, for the five most severe new code and infrastructure issues (default off) | Automatic | In the pull request comment and the scan's result. |
+| Pull request code review | During pull request scans, once per scan (default off) | Automatic | In the pull request comment and the scan's result. Never affects the gate. |
 | Advisory extraction | For each new news item (default off) | Automatic; reviewed by Security Managers / Administrators | Proposed advisories on the news item, until approved or rejected. |
 
 Scan-time checks run while the clone still exists, after findings and tickets are updated. Each finding is assessed once. The number of checks per scan is capped (**AI checks per scan**, default 20); the riskiest findings go first, and the rest are picked up by later scans. If the budget runs out, or a provider fails, triage stops for that scan and the scan itself still succeeds.
@@ -69,6 +72,8 @@ Hints appear next to findings in the findings list, the finding details and the 
 | Remediation, drafting | Ticket key, title, severity, risk score, due date, repository name, visibility and criticality. For up to 10 of its findings: rule, file path and line, package and version, advisory id, summary and exploitability data, and the scanner's own fix guidance. **No source code.** |
 | Secret triage | Rule, file path and line, and the value's *characteristics*, such as length, entropy, character classes and whether it contains words like "example". **Never the value itself.** Also ±4 lines of surrounding code, with the value removed. |
 | Vulnerability applicability | Package, version, dependency type, the advisory, and up to five short excerpts (±4 lines) where the code imports or references the package. |
+| Pull request fix suggestions | The issue (rule, title, scanner guidance) and ±8 lines of code around the flagged lines. |
+| Pull request code review | The changed regions of the pull request's files (three lines of context), its title, and the titles of the issues the scanners found. Lock files, generated code and binaries are left out. |
 | Advisory extraction | The news item's title, link, date and plain text (HTML removed). Nothing from your repositories. |
 
 Before anything is sent:

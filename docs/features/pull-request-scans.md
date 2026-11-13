@@ -23,6 +23,7 @@ Pull request scans appear on the repository page under **Pull requests**, with t
   - the scanner's remediation (for example the fixed version, or Trivy's resolution for a misconfiguration);
   - for a vulnerable **direct** dependency, the command that applies the fix: `npm install lodash@4.17.21`, `dotnet add package …`, `go get …`, `cargo update -p … --precise …`, and so on;
   - optionally an **AI-suggested code change** for code and infrastructure issues (below).
+- Optionally an **AI code review** of the changes (below).
 - Notes: issues already known in the changed files, issues covered by a suppression, and scanners that could not complete.
 
 On GitHub the issues are collapsible sections (the five most severe start open). Bitbucket renders no HTML, so there each issue is a short section. The comment stays below 30,000 characters; further issues are linked to Argus.
@@ -32,6 +33,17 @@ Everything in the comment that comes from the repository (file names, code-deriv
 ## AI fix suggestions (optional)
 
 Turn on **Pull request fix suggestions** under **Administration → AI**. For the five most severe new code and infrastructure issues, Argus sends the issue and the lines around it (secrets redacted, within the AI context limit) to the configured AI provider and asks for the smallest change to the flagged lines. Suggestions with low confidence are dropped. In the comment they are marked as AI suggestions to review before applying. The usual AI controls apply: the repository's AI opt-out, the monthly budget, and the audit log.
+
+## AI code review (optional)
+
+Turn on **Pull request code review** under **Administration → AI**. Argus then also reviews the pull request's changes the way a careful engineer would: bugs and wrong logic, unhandled errors and edge cases, security problems, performance problems, and changed behaviour without a test. It does not comment on formatting or naming.
+
+- **What is reviewed.** The diff of the pull request against the point where its branch left the base branch: the changed regions of each file with three lines of context. Lock files, minified or generated code, build output, binaries and deleted files are left out. Files are added in order until the AI **context limit** is reached; the comment says how many files were not reviewed. Raise the context limit for larger pull requests.
+- **What is sent.** Those diff lines, the pull request title and the titles of the issues the scanners found (so the review does not repeat them). Secrets are redacted first, as in every AI request.
+- **Where it shows.** An **AI code review** section in the same pull request comment: a short summary, then up to 10 remarks, each with a severity (*issue*, *suggestion*, *nitpick*), a category, and a link to the file and line. Remarks that point at a line the diff does not contain are dropped. The same review is shown on the scan in Argus and in the API result as `review`.
+- **It is advisory.** The review never changes the gate, opens no tickets and stores no findings. It is labelled with the model that wrote it. If the AI provider fails, or the budget is used up, the scan still completes without a review.
+
+It needs one extra fetch of the base branch per scan and one AI request per scan. The usual AI controls apply: the repository's AI opt-out, the monthly budget, and the audit log (`ai.request`, use case `pr_review`).
 
 ## Setting it up
 
@@ -123,7 +135,7 @@ Responses:
 Needs `repos:read`. Returns the scan:
 - `status`: `queued`, `running`, `succeeded` or `failed`;
 - `gate`: `passed` or `failed`, once succeeded;
-- `result`: changed files, new-issue counts by severity, the new issues with their fixes, known and suppressed counts, and per-scanner status;
+- `result`: changed files, new-issue counts by severity, the new issues with their fixes, known and suppressed counts, per-scanner status, and `review` (the AI code review, when that feature is on);
 - `commentUrl`, `error`, and `argusUrl`.
 
 `GET /api/v1/ci/pull-requests?repoId=<id>` lists a repository's pull request scans, newest first.

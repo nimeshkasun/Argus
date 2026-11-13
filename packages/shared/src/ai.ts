@@ -52,7 +52,7 @@ export const AI_MODEL_PRICES: Record<string, { input: number; output: number }> 
   'gemini-3.1-flash-lite': { input: 0.25, output: 1.5 },
 };
 
-export const AI_USE_CASES = ['remediation', 'ticket_draft', 'secret_triage', 'vuln_applicability', 'advisory_extraction', 'pr_fix'] as const;
+export const AI_USE_CASES = ['remediation', 'ticket_draft', 'secret_triage', 'vuln_applicability', 'advisory_extraction', 'pr_fix', 'pr_review'] as const;
 export type AiUseCase = (typeof AI_USE_CASES)[number];
 
 export const AI_USE_CASE_LABELS: Record<AiUseCase, { label: string; description: string }> = {
@@ -62,6 +62,7 @@ export const AI_USE_CASE_LABELS: Record<AiUseCase, { label: string; description:
   vuln_applicability: { label: 'Vulnerability applicability', description: 'During scans, judges from how a vulnerable package is used whether the repository is likely affected. Hints only.' },
   advisory_extraction: { label: 'Advisory extraction', description: 'Reads new items from security news feeds and proposes package advisories for review.' },
   pr_fix: { label: 'Pull request fix suggestions', description: 'During pull request scans, suggests a code change for new code and configuration issues, shown in the pull request comment for review.' },
+  pr_review: { label: 'Pull request code review', description: 'During pull request scans, reviews the changes for bugs, risky logic, error handling and missing tests, and adds the remarks to the pull request comment. Advisory only: it never affects the gate.' },
 };
 
 /** Use cases that run during scans (on new findings) rather than on request. */
@@ -106,6 +107,7 @@ export const aiSettingsSchema = z.object({
     // Added in Phase 5; optional so earlier clients keep working.
     advisory_extraction: useCaseSettings.default({ enabled: false, provider: null }),
     pr_fix: useCaseSettings.default({ enabled: false, provider: null }),
+    pr_review: useCaseSettings.default({ enabled: false, provider: null }),
   }),
   /** Requests stop once the estimated spend this calendar month (UTC) reaches the budget. null = no cap. */
   monthlyBudgetUsd: z.number().min(0).max(1_000_000).nullable(),
@@ -140,6 +142,7 @@ export const DEFAULT_AI_SETTINGS: Omit<AiSettingsInput, 'providers'> & { provide
     vuln_applicability: { enabled: false, provider: null },
     advisory_extraction: { enabled: false, provider: null },
     pr_fix: { enabled: false, provider: null },
+    pr_review: { enabled: false, provider: null },
   },
   monthlyBudgetUsd: 50,
   maxContextChars: 12_000,
@@ -179,6 +182,29 @@ export const prFixOutputSchema = z.object({
   confidence,
 });
 export type PrFixOutput = z.infer<typeof prFixOutputSchema>;
+
+export const PR_REVIEW_CATEGORIES = ['bug', 'security', 'error_handling', 'performance', 'maintainability', 'tests', 'other'] as const;
+export const PR_REVIEW_SEVERITIES = ['issue', 'suggestion', 'nitpick'] as const;
+export const PR_REVIEW_MAX_COMMENTS = 10;
+
+export const prReviewOutputSchema = z.object({
+  /** Two or three sentences on what the change does and how sound it looks. */
+  summary: text(1500),
+  comments: z
+    .array(
+      z.object({
+        path: text(500),
+        /** A line of the new version of the file that appears in the diff. */
+        line: z.number().int().min(1).max(10_000_000),
+        category: z.enum(PR_REVIEW_CATEGORIES),
+        severity: z.enum(PR_REVIEW_SEVERITIES),
+        comment: text(900),
+      }),
+    )
+    .max(PR_REVIEW_MAX_COMMENTS),
+  confidence,
+});
+export type PrReviewOutput = z.infer<typeof prReviewOutputSchema>;
 
 export const draftOutputSchema = z.object({
   subject: text(250),

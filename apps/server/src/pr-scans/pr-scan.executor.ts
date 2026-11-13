@@ -16,6 +16,7 @@ import { SourcesService } from '../sources/sources.service';
 import { suggestFixes } from './pr-ai';
 import { buildResult, pullRequestDelta } from './pr-analysis';
 import { renderPrComment } from './pr-comment';
+import { collectDiff, reviewEnabled, reviewPullRequest } from './pr-review';
 import { PR_SCAN_JOB, PrScansService } from './pr-scans.service';
 
 const MAX_LOG_LINES = 300;
@@ -125,7 +126,32 @@ export class PrScanExecutor implements OnModuleInit {
         return new Map();
       });
 
+      // Optional AI code review of the diff. Advisory: it never changes the gate, and a failure only skips it.
+      let review = null;
+      if (pr.baseBranch && (await reviewEnabled(this.ai, repo))) {
+        const diff = await collectDiff({
+          git,
+          workdir,
+          baseUrl: assertCloneUrlAllowed(client, repo.cloneUrl).toString(),
+          baseBranch: pr.baseBranch,
+          headUrl: cloneUrl.toString(),
+          headRef: pr.fetch.ref,
+          changed,
+          log,
+        });
+        if (diff) {
+          review = await reviewPullRequest(
+            { ai: this.ai, repo, title: pr.title, diff, known: delta.introduced.filter((f) => f.path).slice(0, 30).map((f) => `${f.path}${f.line ? `:${f.line}` : ''} ${f.title}`), knownSecrets: [...analysis.secretValues.values()], subjectId: `${repo.id}#${scan.number}` },
+            log,
+          ).catch((err: unknown) => {
+            log(`AI code review failed: ${err instanceof Error ? err.message : String(err)}`);
+            return null;
+          });
+        }
+      }
+
       const result = buildResult(delta, { changedFiles: changed?.length ?? files.length, failOn: scan.failOn, scanners: analysis.results, ai });
+      result.review = review;
       log(`Result: ${delta.introduced.length} new issue(s), gate ${result.gate}; ${delta.existingInChangedFiles} already known in changed files, ${delta.suppressed} suppressed`);
       const patch: PrScanPatch = { status: 'succeeded', headSha, result };
       if (scan.comment) Object.assign(patch, await this.comment(scan, repo.fullName, source.provider, repo.htmlUrl, headSha, result, log));

@@ -16,12 +16,13 @@ export interface MockAiOptions {
   status?: number;
 }
 
-type Kind = 'remediation' | 'draft' | 'secret_triage' | 'applicability' | 'advisory_extraction' | 'ping';
+type Kind = 'remediation' | 'draft' | 'secret_triage' | 'applicability' | 'advisory_extraction' | 'pr_review' | 'ping';
 
 function kindOf(schema: { properties?: Record<string, { enum?: string[] }> } | undefined): Kind {
   const p = schema?.properties ?? {};
   if (p.steps) return 'remediation';
   if (p.advisories) return 'advisory_extraction';
+  if (p.comments) return 'pr_review';
   if (p.subject) return 'draft';
   if (p.verdict?.enum?.includes('likely_real')) return 'secret_triage';
   if (p.verdict) return 'applicability';
@@ -41,6 +42,14 @@ const DEFAULT_ANSWERS: Record<Kind, unknown> = {
   secret_triage: { verdict: 'likely_false_positive', rationale: 'The value sits in a test fixture and is named as an example.', confidence: 0.8 },
   applicability: { verdict: 'likely_affected', rationale: 'The code calls _.template with user input.', confidence: 0.7 },
   advisory_extraction: { relevant: false, advisories: [], rationale: 'General news; no npm or NuGet package is named.', confidence: 0.9 },
+  pr_review: {
+    summary: 'Adds a checkout module and a region setting.',
+    comments: [
+      { path: 'src/checkout.js', line: 2, category: 'maintainability', severity: 'suggestion', comment: 'Export a function that reads the token from configuration instead of exporting the value.' },
+      { path: 'src/checkout.js', line: 999, category: 'bug', severity: 'issue', comment: 'This line is not in the diff and must be dropped.' },
+    ],
+    confidence: 0.8,
+  },
   ping: { ok: true },
 };
 

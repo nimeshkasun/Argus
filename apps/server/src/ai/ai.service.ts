@@ -151,6 +151,11 @@ export class AiService {
     };
   }
 
+  /** The most repository content one prompt may include (administrator setting). */
+  async contextLimit(): Promise<number> {
+    return (await this.stored()).maxContextChars;
+  }
+
   /** Whether a background use case may run for this repository (no exception, for scans). */
   async canRun(useCase: AiUseCase, repo: Repository | null): Promise<boolean> {
     try {

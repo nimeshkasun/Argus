@@ -52,6 +52,7 @@ See [Sources, repositories and scans](sources-and-repositories.md).
 | CycloneDX SBOM per repository; organisation-wide package search | ✅ |
 | **Pull request scans from CI** (GitHub Actions, Bitbucket Pipelines, any CI): only issues the pull request introduces, a severity gate for the build, and one self-updating comment on the pull request with fixes — see [Pull request scans](pull-request-scans.md) | ✅ |
 | AI fix suggestions on pull request comments (opt-in) | ✅ |
+| AI code review of the pull request's changes, in the same comment (opt-in, advisory) | ✅ |
 | Credential inventory (tracked secrets with expiry notices; Microsoft Entra ID app secrets and certificates imported daily) — see [Dashboards, reports and credentials](dashboards-and-reports.md#credential-inventory) | ✅ |
 
 ## Risk & tickets

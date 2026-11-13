@@ -143,6 +143,37 @@ function PrScanModal({ scanId, onClose }: { scanId: string; onClose(): void }) {
                 </Table>
               )}
               {s.result.truncated && <p className="text-xs text-slate-500">Only the {s.result.findings.length} most severe issues are listed.</p>}
+              {s.result.review && (
+                <div className="space-y-2 rounded-md border border-slate-200 p-3 dark:border-slate-700">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium">AI code review</span>
+                    <Badge>AI-assisted · {s.result.review.model}</Badge>
+                    <span className="text-xs text-slate-500">Advisory: it does not affect the gate.</span>
+                  </div>
+                  <p className="text-slate-600 dark:text-slate-300">{s.result.review.summary}</p>
+                  {s.result.review.comments.length > 0 ? (
+                    <ul className="space-y-2">
+                      {s.result.review.comments.map((c, i) => (
+                        <li key={i}>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge tone={c.severity === 'issue' ? 'red' : c.severity === 'suggestion' ? 'amber' : 'slate'}>{c.severity}</Badge>
+                            <span className="font-mono text-xs">
+                              {c.path}:{c.line}
+                            </span>
+                            <span className="text-xs text-slate-500">{c.category.replace('_', ' ')}</span>
+                          </div>
+                          <div className="mt-0.5 text-slate-700 dark:text-slate-200">{c.comment}</div>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-xs text-slate-500">No remarks.</p>
+                  )}
+                  <p className="text-xs text-slate-500">
+                    {s.result.review.filesReviewed} file(s) reviewed{s.result.review.filesSkipped > 0 && `, ${s.result.review.filesSkipped} left out (generated, lock files, binary or too large)`}.
+                  </p>
+                </div>
+              )}
               <div className="flex flex-wrap gap-1">
                 {s.result.scanners.map((r) => (
                   <Badge key={r.scanner} tone={r.status === 'ok' ? 'slate' : r.status === 'skipped' ? 'slate' : 'amber'}>

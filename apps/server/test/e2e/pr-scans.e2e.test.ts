@@ -11,6 +11,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createApiApp } from '../../src/app.factory';
 import { AppConfig } from '../../src/config/app-config';
 import { BASE_TEST_ENV, Client, dbHarnesses, waitFor } from './helpers';
+import { type AiCall, aiRoutes } from './mock-ai';
 import { createGitRepo, type FixtureRepo, type MockGitHub, startMockGitHub } from './mock-github';
 import { intelEnv, intelRoutes, lockfile, LODASH_GHSA } from './mock-intel';
 
@@ -31,6 +32,7 @@ describe.each(dbHarnesses())('pull request scans from CI e2e: $name', (h) => {
   let prHead = '';
   const comments: { method: string; path: string; body: string }[] = [];
   const intelCalls = new Map<string, number>();
+  const aiCalls: AiCall[] = [];
 
   /** Commits a pull request branch on top of main and publishes it as refs/pull/7/head, like GitHub does. */
   const pushPullRequest = (files: Record<string, string>, message: string) => {
@@ -94,7 +96,8 @@ describe.each(dbHarnesses())('pull request scans from CI e2e: $name', (h) => {
       'src/config.js': `module.exports = { accessKeyId: "${AWS_KEY}" };\n`,
     });
     const intel = intelRoutes(intelCalls);
-    mock = await startMockGitHub({ bare: fixture.bare, token: TOKEN, repos: [{ id: 601, name: 'shop' }], extra: (req, url, body, res) => pullRequestRoutes(req, url, body, res) || intel(req, url, body, res) });
+    const ai = aiRoutes(aiCalls);
+    mock = await startMockGitHub({ bare: fixture.bare, token: TOKEN, repos: [{ id: 601, name: 'shop' }], extra: (req, url, body, res) => pullRequestRoutes(req, url, body, res) || intel(req, url, body, res) || ai(req, url, body, res) });
     const env = await h.env();
     app = await createApiApp(
       AppConfig.fromEnv({
@@ -199,5 +202,47 @@ describe.each(dbHarnesses())('pull request scans from CI e2e: $name', (h) => {
     const audit = (await admin.call('get', '/api/v1/audit?action=pr_scan.requested&pageSize=10')).body as { items: { details: Record<string, unknown> }[] };
     expect(audit.items.length).toBeGreaterThanOrEqual(2);
     expect(audit.items[0].details).toMatchObject({ repo: 'acme/shop', pullRequest: 7 });
+  });
+
+  it('adds an AI code review of the diff when that feature is on, through a Relay gateway, without changing the gate', async () => {
+    const off = (model: string) => ({ enabled: false, model, baseUrl: null, inputPricePerMTok: null, outputPricePerMTok: null });
+    const use = (enabled: boolean) => ({ enabled, provider: null });
+    const saved = await admin.call('put', '/api/v1/settings/ai', {
+      enabled: true,
+      defaultProvider: 'relay',
+      providers: { anthropic: off('claude-opus-5-5'), openai: off('gpt-6.1-sol'), gemini: off('gemini-3.8-flash'), relay: { ...off('smart'), enabled: true, baseUrl: `${mock.baseUrl}/ai/relay`, apiKey: 'rly_e2e_review_key_0001' } },
+      useCases: { remediation: use(false), ticket_draft: use(false), secret_triage: use(false), vuln_applicability: use(false), pr_review: use(true) },
+      monthlyBudgetUsd: 100,
+      maxContextChars: 12000,
+      maxScanChecks: 20,
+    });
+    expect(saved.status).toBe(200);
+    expect(saved.body.providers.relay).toMatchObject({ enabled: true, keyConfigured: true, keyHint: '••••0001' });
+
+    pushPullRequest({ 'src/checkout.js': 'const token = process.env.CHECKOUT_TOKEN;\nmodule.exports = token;\n' }, 'read the token from the environment');
+    const res = await ci('post', '/api/v1/ci/pull-requests', { repository: 'acme/shop', pullRequest: 7 });
+    const scan = await finished(res.body.id);
+    expect(scan).toMatchObject({ status: 'succeeded', gate: 'passed' });
+
+    // The remark on a line outside the diff was dropped; the lock file was not sent.
+    expect(scan.result!.review).toMatchObject({ summary: 'Adds a checkout module and a region setting.', provider: 'relay', model: 'openai/gpt-6.1-sol', filesReviewed: 2 });
+    expect(scan.result!.review!.comments).toEqual([expect.objectContaining({ path: 'src/checkout.js', line: 2, severity: 'suggestion' })]);
+    const call = aiCalls.at(-1)!;
+    expect(call.provider).toBe('relay');
+    expect(call.headers.authorization).toBe('Bearer rly_e2e_review_key_0001');
+    expect(call.text).toContain('<diff path="src/checkout.js">');
+    // Numbered lines of the new file; credential-like assignments are redacted like in every other prompt.
+    expect(call.text).toContain('+ 2: module.exports = token;');
+    expect(call.text).not.toContain('package-lock.json');
+    expect(call.text).not.toContain(AWS_KEY);
+
+    const body = comments.at(-1)!.body;
+    expect(body).toContain('✅ passed');
+    expect(body).toContain('AI code review (1 remark)');
+    expect(body).toContain('src/checkout.js:2');
+    expect(body).toContain('It does not affect the gate');
+
+    const audit = (await admin.call('get', '/api/v1/audit?action=ai.request&pageSize=5')).body as { items: { details: Record<string, unknown> }[] };
+    expect(audit.items[0].details).toMatchObject({ useCase: 'pr_review', provider: 'relay', repo: 'acme/shop', outcome: 'ok' });
   });
 });
