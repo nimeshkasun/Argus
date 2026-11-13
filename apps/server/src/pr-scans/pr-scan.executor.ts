@@ -21,6 +21,8 @@ import { PR_SCAN_JOB, PrScansService } from './pr-scans.service';
 
 const MAX_LOG_LINES = 300;
 const MAX_READ_BYTES = 1024 * 1024;
+/** How often the log of a running scan is saved, so it can be followed while the scan runs. */
+const LOG_FLUSH_MS = 2000;
 
 /**
  * Executes `pr.scan` jobs: fetches the pull request's head into an ephemeral workspace, runs the scanners without
@@ -56,7 +58,24 @@ export class PrScanExecutor implements OnModuleInit {
     const log = (message: string) => {
       if (lines.length < MAX_LOG_LINES) lines.push(`${new Date().toISOString()} ${redactor.redact(message)}`);
     };
-    const finish = (patch: PrScanPatch) => this.store.prScans.update(scan.id, { ...patch, log: lines, finishedAt: new Date() });
+    // The log is saved as the scan goes, one write at a time, so it can be followed while the scan runs.
+    let saved = lines.length;
+    let saving: Promise<unknown> = Promise.resolve();
+    const timer = setInterval(() => {
+      if (lines.length === saved) return;
+      saved = lines.length;
+      saving = saving.then(() => this.store.prScans.update(scan.id, { log: [...lines] })).catch(() => undefined);
+    }, LOG_FLUSH_MS);
+    timer.unref();
+    /** Before the last write of the scan, so a slower earlier save cannot land after it. */
+    const stopSaving = async () => {
+      clearInterval(timer);
+      await saving;
+    };
+    const finish = async (patch: PrScanPatch) => {
+      await stopSaving();
+      return this.store.prScans.update(scan.id, { ...patch, log: lines, finishedAt: new Date() });
+    };
 
     if (!repo || !source || repo.removedAt) {
       await finish({ status: 'failed', error: 'The repository no longer exists in its source.' });
@@ -175,9 +194,11 @@ export class PrScanExecutor implements OnModuleInit {
         throw new PermanentJobError(message);
       }
       log('Will retry');
+      await stopSaving();
       await this.store.prScans.update(scan.id, { status: 'queued', error: message, log: lines });
       throw new Error(message);
     } finally {
+      clearInterval(timer);
       // The checked-out code is never kept.
       await rm(workdir, { recursive: true, force: true, maxRetries: 3 }).catch((err: unknown) => this.logger.error({ err, workdir }, 'Failed to delete pull request scan workspace'));
     }
