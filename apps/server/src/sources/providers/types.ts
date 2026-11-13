@@ -35,6 +35,17 @@ export interface PullRequestComment {
   url: string | null;
 }
 
+/** A review comment anchored to a line of the new version of a file in a pull request. */
+export interface InlineCommentInput {
+  path: string;
+  line: number;
+  /** Whether the pull request added or changed the line (as opposed to an unchanged line shown next to a change). */
+  added: boolean;
+  /** The pull request's head commit the line number refers to. */
+  commitSha: string;
+  body: string;
+}
+
 export interface ProviderClient {
   /** Verifies the credentials and scope. Throws ProviderError with an actionable message. */
   check(): Promise<ConnectionCheck>;
@@ -53,6 +64,10 @@ export interface ProviderClient {
   pullRequestFiles(fullName: string, number: number): Promise<string[]>;
   /** Posts a comment (Markdown), or replaces the text of `existing` if it still exists. */
   upsertPullRequestComment(fullName: string, number: number, body: string, existing: string | null): Promise<PullRequestComment>;
+  /** Posts a comment on a line of the pull request's diff and returns its id. */
+  createInlineComment(fullName: string, number: number, comment: InlineCommentInput): Promise<string>;
+  /** Removes an inline comment Argus posted earlier. Missing comments are not an error. */
+  deleteInlineComment(fullName: string, number: number, id: string): Promise<void>;
 }
 
 /** Most files of a pull request Argus reads; larger pull requests are scanned as a whole. */

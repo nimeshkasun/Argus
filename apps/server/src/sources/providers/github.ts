@@ -1,7 +1,7 @@
 import { createHash, createPrivateKey, type KeyObject, sign } from 'node:crypto';
 import { type DiscoveredRepo, type Visibility } from '@argus/data';
 import { getJson, normalizeBaseUrl, ProviderError, requestJson } from './http';
-import { type ConnectionCheck, MAX_PAGES, MAX_PR_FILES, type ProviderClient, type ProviderConnection, type PullRequestComment, type PullRequestInfo } from './types';
+import { type ConnectionCheck, type InlineCommentInput, MAX_PAGES, MAX_PR_FILES, type ProviderClient, type ProviderConnection, type PullRequestComment, type PullRequestInfo } from './types';
 
 interface GhRepo {
   id: number;
@@ -82,7 +82,7 @@ export class GitHubClient implements ProviderClient {
     return `${this.api.toString().replace(/\/+$/, '')}${path}`;
   }
 
-  private request<T>(url: string, bearer: string, method: 'GET' | 'POST' | 'PATCH' = 'GET', body?: unknown) {
+  private request<T>(url: string, bearer: string, method: 'GET' | 'POST' | 'PATCH' | 'DELETE' = 'GET', body?: unknown) {
     return requestJson<T>(url, { method, body, headers: { Authorization: `Bearer ${bearer}`, ...API_HEADERS }, allowedOrigin: this.api.origin, providerName: NAME });
   }
 
@@ -238,6 +238,21 @@ export class GitHubClient implements ProviderClient {
     }
     const { data } = await this.request<{ id: number; html_url: string }>(this.url(`${this.repoPath(fullName)}/issues/${number}/comments`), token, 'POST', { body });
     return { id: String(data.id), url: data.html_url };
+  }
+
+  async createInlineComment(fullName: string, number: number, c: InlineCommentInput): Promise<string> {
+    // A review comment on the new ("RIGHT") side of the diff, at the commit that was scanned.
+    const { data } = await this.request<{ id: number }>(this.url(`${this.repoPath(fullName)}/pulls/${number}/comments`), await this.accessToken(), 'POST', { body: c.body, commit_id: c.commitSha, path: c.path, line: c.line, side: 'RIGHT' });
+    return String(data.id);
+  }
+
+  async deleteInlineComment(fullName: string, _number: number, id: string): Promise<void> {
+    if (!/^\d+$/.test(id)) return;
+    try {
+      await this.request<void>(this.url(`${this.repoPath(fullName)}/pulls/comments/${id}`), await this.accessToken(), 'DELETE');
+    } catch (err) {
+      if (!(err instanceof ProviderError && err.status === 404)) throw err;
+    }
   }
 
   allowedCloneHosts(): string[] {

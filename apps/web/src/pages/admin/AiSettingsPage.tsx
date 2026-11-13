@@ -243,6 +243,16 @@ export function AiSettingsPage() {
             <div key={u} className="flex flex-wrap items-center gap-4 px-5 py-4">
               <div className="min-w-60 flex-1">
                 <Checkbox label={AI_USE_CASE_LABELS[u].label} description={AI_USE_CASE_LABELS[u].description} checked={f.useCases[u].enabled} onChange={(e) => setUseCase(u, { enabled: e.target.checked })} />
+                {u === 'pr_review' && f.useCases.pr_review.enabled && (
+                  <div className="mt-3 pl-7">
+                    <Checkbox
+                      label="Post remarks as inline comments"
+                      description="Each remark is posted on its line of the pull request, like a reviewer's comment, instead of being listed in the summary comment. A new scan replaces the previous scan's inline comments."
+                      checked={f.prReviewInline}
+                      onChange={(e) => setF({ ...f, prReviewInline: e.target.checked })}
+                    />
+                  </div>
+                )}
               </div>
               <Select aria-label={`Provider for ${AI_USE_CASE_LABELS[u].label}`} className="w-56" value={f.useCases[u].provider ?? ''} onChange={(e) => setUseCase(u, { provider: (e.target.value || null) as AiProvider | null })}>
                 <option value="">Default provider</option>

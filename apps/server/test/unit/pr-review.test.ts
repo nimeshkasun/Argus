@@ -88,7 +88,8 @@ describe('AI code review', () => {
     const logs: string[] = [];
     const review = await reviewPullRequest(input(ai), (m) => logs.push(m));
     expect(review).toMatchObject({ summary: 'Multiplies prices by quantity.', filesReviewed: 1, filesSkipped: 3, provider: 'relay', model: 'openai/gpt-6.1-sol' });
-    expect(review!.comments).toEqual([answer.comments[0]]);
+    // Line 12 is one the pull request added, which providers need to know to anchor an inline comment.
+    expect(review!.comments).toEqual([{ ...answer.comments[0], added: true }]);
     expect(prompts[0]).toContain('<diff path="src/cart.js">');
     expect(prompts[0]).toContain('+ 12:   if (sum < 0) return;');
     expect(prompts[0]).toContain('<known_issues>\nsrc/cart.js:3 Hard-coded secret');

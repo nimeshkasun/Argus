@@ -1,6 +1,6 @@
 import { type DiscoveredRepo } from '@argus/data';
 import { basicAuth, getJson, normalizeBaseUrl, ProviderError, requestJson, stripUserInfo } from './http';
-import { type ConnectionCheck, MAX_PAGES, MAX_PR_FILES, type ProviderClient, type ProviderConnection, type PullRequestComment, type PullRequestInfo } from './types';
+import { type ConnectionCheck, type InlineCommentInput, MAX_PAGES, MAX_PR_FILES, type ProviderClient, type ProviderConnection, type PullRequestComment, type PullRequestInfo } from './types';
 
 interface CloudRepo {
   uuid: string;
@@ -40,7 +40,7 @@ export class BitbucketCloudClient implements ProviderClient {
     return getJson<T>(url, { headers: { Authorization: this.authorization() }, allowedOrigin: this.api.origin, providerName: this.name });
   }
 
-  private send<T>(url: string, method: 'POST' | 'PUT', body: unknown) {
+  private send<T>(url: string, method: 'POST' | 'PUT' | 'DELETE', body: unknown) {
     return requestJson<T>(url, { method, body, headers: { Authorization: this.authorization() }, allowedOrigin: this.api.origin, providerName: this.name });
   }
 
@@ -154,6 +154,21 @@ export class BitbucketCloudClient implements ProviderClient {
     const { data } = await this.send<CloudComment>(comments, 'POST', { content: { raw: body } });
     return { id: String(data.id), url: data.links.html?.href ?? null };
   }
+
+  async createInlineComment(fullName: string, number: number, c: InlineCommentInput): Promise<string> {
+    // "to" is a line of the new version of the file.
+    const { data } = await this.send<{ id: number }>(`${this.repoUrl(fullName)}/pullrequests/${number}/comments`, 'POST', { content: { raw: c.body }, inline: { path: c.path, to: c.line } });
+    return String(data.id);
+  }
+
+  async deleteInlineComment(fullName: string, number: number, id: string): Promise<void> {
+    if (!/^\d+$/.test(id)) return;
+    try {
+      await this.send<void>(`${this.repoUrl(fullName)}/pullrequests/${number}/comments/${id}`, 'DELETE', undefined);
+    } catch (err) {
+      if (!(err instanceof ProviderError && err.status === 404)) throw err;
+    }
+  }
 }
 
 interface ServerRepo {
@@ -195,7 +210,7 @@ export class BitbucketServerClient implements ProviderClient {
     return getJson<T>(url, { headers: { Authorization: this.authorization() }, allowedOrigin: this.base.origin, providerName: this.name });
   }
 
-  private send<T>(url: string, method: 'POST' | 'PUT', body: unknown) {
+  private send<T>(url: string, method: 'POST' | 'PUT' | 'DELETE', body: unknown) {
     // Bitbucket Data Center refuses state-changing calls without this header (XSRF protection).
     return requestJson<T>(url, { method, body, headers: { Authorization: this.authorization(), 'X-Atlassian-Token': 'no-check' }, allowedOrigin: this.base.origin, providerName: this.name });
   }
@@ -301,5 +316,23 @@ export class BitbucketServerClient implements ProviderClient {
     }
     const { data } = await this.send<{ id: number }>(comments, 'POST', { text: body });
     return { id: String(data.id), url: link(data.id) };
+  }
+
+  async createInlineComment(fullName: string, number: number, c: InlineCommentInput): Promise<string> {
+    const anchor = { path: c.path, line: c.line, lineType: c.added ? 'ADDED' : 'CONTEXT', fileType: 'TO', diffType: 'EFFECTIVE' };
+    const { data } = await this.send<{ id: number }>(`${this.repoUrl(fullName)}/pull-requests/${number}/comments`, 'POST', { text: c.body, anchor });
+    return String(data.id);
+  }
+
+  async deleteInlineComment(fullName: string, number: number, id: string): Promise<void> {
+    if (!/^\d+$/.test(id)) return;
+    const url = `${this.repoUrl(fullName)}/pull-requests/${number}/comments/${id}`;
+    try {
+      // Deletions must name the comment's current version.
+      const { data: current } = await this.get<{ version: number }>(url);
+      await this.send<void>(`${url}?version=${current.version}`, 'DELETE', undefined);
+    } catch (err) {
+      if (!(err instanceof ProviderError && err.status === 404)) throw err;
+    }
   }
 }

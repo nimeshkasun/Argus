@@ -1,4 +1,4 @@
-import { type PrFindingDto, type PrReviewDto, type PrScanFailOn, type PrScanResult, SCANNER_LABELS, type Severity, SEVERITIES } from '@argus/shared';
+import { type PrFindingDto, type PrReviewCommentDto, type PrReviewDto, type PrScanFailOn, type PrScanResult, SCANNER_LABELS, type Severity, SEVERITIES } from '@argus/shared';
 
 /** Comment size limit that every provider accepts (Bitbucket's is the smallest). */
 export const MAX_COMMENT_CHARS = 30_000;
@@ -70,7 +70,9 @@ const CATEGORY_LABEL = { bug: 'bug', security: 'security', error_handling: 'erro
 
 /** The AI code review: advisory remarks, clearly labelled, each linked to its line. */
 function reviewSection(r: PrReviewDto, ctx: CommentContext, html: boolean): string {
-  const lines = r.comments.map((c) => {
+  // Remarks posted as inline comments are on their lines already; only the others are listed here.
+  const inline = r.comments.filter((c) => c.inline).length;
+  const lines = r.comments.filter((c) => !c.inline).map((c) => {
     const link = fileLink(ctx.provider, ctx.repoUrl, ctx.headSha, c.path, c.line);
     const where = code(`${c.path}:${c.line}`);
     return `- ${REVIEW_ICON[c.severity]} **${label(c.severity)}** · ${link ? `[${where}](${link})` : where} · ${CATEGORY_LABEL[c.category]}: ${escapeMarkdown(c.comment)}`;
@@ -79,13 +81,19 @@ function reviewSection(r: PrReviewDto, ctx: CommentContext, html: boolean): stri
   const body = [
     `_AI-assisted review by ${escapeMarkdown(r.model)}. It can be wrong: use your judgement. It does not affect the gate._`,
     escapeMarkdown(r.summary),
-    lines.length ? lines.join('\n') : 'No remarks.',
+    inline ? `${inline} remark${inline === 1 ? ' is' : 's are'} posted as inline comment${inline === 1 ? '' : 's'} on the changed lines.` : null,
+    lines.length ? lines.join('\n') : inline ? null : 'No remarks.',
     skipped ? `_${skipped.trim()}_` : null,
   ]
     .filter(Boolean)
     .join('\n\n');
   const title = `🤖 AI code review${r.comments.length ? ` (${r.comments.length} remark${r.comments.length === 1 ? '' : 's'})` : ''}`;
   return html ? `<details open>\n<summary><b>${title}</b></summary>\n\n${body}\n\n</details>` : `### ${title}\n${body}`;
+}
+
+/** One remark of the AI code review as an inline comment on its line. The model's text is escaped like everything else. */
+export function renderInlineComment(c: PrReviewCommentDto, model: string): string {
+  return `${REVIEW_ICON[c.severity]} **${label(c.severity)}** · ${CATEGORY_LABEL[c.category]}\n\n${escapeMarkdown(c.comment)}\n\n_AI-assisted review by ${escapeMarkdown(model)}, posted by Argus. It can be wrong: use your judgement._`;
 }
 
 function findingBlock(f: PrFindingDto, ctx: CommentContext, html: boolean, open: boolean): string {

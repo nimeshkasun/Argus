@@ -2,7 +2,7 @@ import { mkdir, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Inject, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import { type DataStore, type Job, type PrScan, type PrScanPatch } from '@argus/data';
-import { type PrScanResult } from '@argus/shared';
+import { type PrReviewDto, type PrScanResult } from '@argus/shared';
 import { AiService } from '../ai/ai.service';
 import { Redactor } from '../common/redact';
 import { AppConfig } from '../config/app-config';
@@ -11,11 +11,11 @@ import { type JobContext, JobRunner, PermanentJobError } from '../jobs/job-runne
 import { ScanPipeline } from '../scanning/scan-pipeline.service';
 import { GitError, runGit } from '../scans/git';
 import { walkFiles } from '../scans/inventory';
-import { assertCloneUrlAllowed, MAX_PR_FILES, ProviderError } from '../sources/providers';
+import { assertCloneUrlAllowed, MAX_PR_FILES, type ProviderClient, ProviderError } from '../sources/providers';
 import { SourcesService } from '../sources/sources.service';
 import { suggestFixes } from './pr-ai';
 import { buildResult, pullRequestDelta } from './pr-analysis';
-import { renderPrComment } from './pr-comment';
+import { renderInlineComment, renderPrComment } from './pr-comment';
 import { collectDiff, reviewEnabled, reviewPullRequest } from './pr-review';
 import { PR_SCAN_JOB, PrScansService } from './pr-scans.service';
 
@@ -154,6 +154,7 @@ export class PrScanExecutor implements OnModuleInit {
       result.review = review;
       log(`Result: ${delta.introduced.length} new issue(s), gate ${result.gate}; ${delta.existingInChangedFiles} already known in changed files, ${delta.suppressed} suppressed`);
       const patch: PrScanPatch = { status: 'succeeded', headSha, result };
+      if (scan.comment && review) await this.inlineComments(scan, repo.fullName, client, headSha, review, log);
       if (scan.comment) Object.assign(patch, await this.comment(scan, repo.fullName, source.provider, repo.htmlUrl, headSha, result, log));
       await finish(patch);
     } catch (err) {
@@ -171,6 +172,46 @@ export class PrScanExecutor implements OnModuleInit {
       // The checked-out code is never kept.
       await rm(workdir, { recursive: true, force: true, maxRetries: 3 }).catch((err: unknown) => this.logger.error({ err, workdir }, 'Failed to delete pull request scan workspace'));
     }
+  }
+
+  /**
+   * With "inline comments" on, posts each remark of the AI code review on its line of the pull request and removes
+   * the ones the previous scan posted. A remark that cannot be posted inline stays in the summary comment. Never
+   * fails the scan.
+   */
+  private async inlineComments(scan: PrScan, fullName: string, client: ProviderClient, headSha: string, review: PrReviewDto, log: (m: string) => void): Promise<void> {
+    const previous = await this.store.prScans.findLastCommented(scan.repoId, scan.number);
+    const stale = previous?.result?.review?.inlineIds ?? [];
+    const enabled = (await this.ai.getSettings()).prReviewInline;
+    if (!enabled && !stale.length) return;
+
+    // Replace rather than pile up: a new scan reviews the pull request afresh.
+    let removed = 0;
+    for (const id of stale) {
+      try {
+        await client.deleteInlineComment(fullName, scan.number, id);
+        removed++;
+      } catch {
+        // For example a comment someone replied to, which the provider keeps.
+      }
+    }
+    if (stale.length) log(`Removed ${removed} of ${stale.length} inline comment(s) from the previous scan`);
+    if (!enabled) return;
+
+    const ids: string[] = [];
+    let failure: string | null = null;
+    for (const c of review.comments) {
+      try {
+        ids.push(await client.createInlineComment(fullName, scan.number, { path: c.path, line: c.line, added: c.added ?? true, commitSha: headSha, body: renderInlineComment(c, review.model) }));
+        c.inline = true;
+      } catch (err) {
+        failure ??= err instanceof Error ? err.message : String(err);
+        // Without permission none of them will work.
+        if (err instanceof ProviderError && (err.status === 401 || err.status === 403)) break;
+      }
+    }
+    review.inlineIds = ids;
+    if (review.comments.length) log(`Posted ${ids.length} of ${review.comments.length} review remark(s) as inline comments${failure ? `; the rest stay in the summary comment (${failure})` : ''}`);
   }
 
   /** Posts the summary comment, or updates the one an earlier scan of this pull request posted. Never fails the scan. */

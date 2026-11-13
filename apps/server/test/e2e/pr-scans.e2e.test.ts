@@ -33,6 +33,8 @@ describe.each(dbHarnesses())('pull request scans from CI e2e: $name', (h) => {
   const comments: { method: string; path: string; body: string }[] = [];
   const intelCalls = new Map<string, number>();
   const aiCalls: AiCall[] = [];
+  /** Inline review comments created and deleted on the pull request. */
+  const inline: { method: string; id: number; body: Record<string, unknown> }[] = [];
 
   /** Commits a pull request branch on top of main and publishes it as refs/pull/7/head, like GitHub does. */
   const pushPullRequest = (files: Record<string, string>, message: string) => {
@@ -70,6 +72,17 @@ describe.each(dbHarnesses())('pull request scans from CI e2e: $name', (h) => {
     if (req.method === 'PATCH' && p === '/api/v3/repos/acme/shop/issues/comments/4242') {
       comments.push({ method: 'PATCH', path: p, body: (JSON.parse(body) as { body: string }).body });
       return json({ id: 4242, html_url: `${mock.baseUrl}/acme/shop/pull/7#issuecomment-4242` });
+    }
+    if (req.method === 'POST' && p === '/api/v3/repos/acme/shop/pulls/7/comments') {
+      const id = 9000 + inline.length;
+      inline.push({ method: 'POST', id, body: JSON.parse(body) as Record<string, unknown> });
+      return json({ id }, 201);
+    }
+    const del = /^\/api\/v3\/repos\/acme\/shop\/pulls\/comments\/(\d+)$/.exec(p);
+    if (req.method === 'DELETE' && del) {
+      inline.push({ method: 'DELETE', id: Number(del[1]), body: {} });
+      res.writeHead(204).end();
+      return true;
     }
     return json({ message: 'Not Found' }, 404);
   };
@@ -244,5 +257,31 @@ describe.each(dbHarnesses())('pull request scans from CI e2e: $name', (h) => {
 
     const audit = (await admin.call('get', '/api/v1/audit?action=ai.request&pageSize=5')).body as { items: { details: Record<string, unknown> }[] };
     expect(audit.items[0].details).toMatchObject({ useCase: 'pr_review', provider: 'relay', repo: 'acme/shop', outcome: 'ok' });
+    // Inline comments are off unless an administrator turns them on.
+    expect(inline).toEqual([]);
+  });
+
+  it('posts the review remarks as inline comments when that is turned on, replacing the previous scan\'s', async () => {
+    const current = (await admin.call('get', '/api/v1/settings/ai')).body;
+    const saved = await admin.call('put', '/api/v1/settings/ai', { ...current, prReviewInline: true });
+    expect(saved.status).toBe(200);
+    expect(saved.body.prReviewInline).toBe(true);
+
+    const first = await finished((await ci('post', '/api/v1/ci/pull-requests', { repository: 'acme/shop', pullRequest: 7 })).body.id);
+    expect(first).toMatchObject({ status: 'succeeded', gate: 'passed' });
+    expect(inline).toHaveLength(1);
+    expect(inline[0]).toMatchObject({ method: 'POST', body: { path: 'src/checkout.js', line: 2, side: 'RIGHT', commit_id: prHead } });
+    expect(String(inline[0].body.body)).toContain('**Suggestion** · maintainability');
+    expect(String(inline[0].body.body)).toContain('AI-assisted review by openai/gpt-6.1-sol');
+    expect(first.result!.review).toMatchObject({ inlineIds: ['9000'], comments: [expect.objectContaining({ line: 2, inline: true, added: true })] });
+    // The summary keeps the overview and points to the inline comment instead of repeating it.
+    const body = comments.at(-1)!.body;
+    expect(body).toContain('1 remark is posted as inline comment on the changed lines.');
+    expect(body).not.toContain('Export a function that reads the token');
+
+    // The next scan reviews afresh: it removes the comment it posted before and posts the new one.
+    const second = await finished((await ci('post', '/api/v1/ci/pull-requests', { repository: 'acme/shop', pullRequest: 7 })).body.id);
+    expect(inline.map((c) => [c.method, c.id])).toEqual([['POST', 9000], ['DELETE', 9000], ['POST', 9002]]);
+    expect(second.result!.review!.inlineIds).toEqual(['9002']);
   });
 });

@@ -115,6 +115,8 @@ export const aiSettingsSchema = z.object({
   maxContextChars: z.number().int().min(1000).max(100_000),
   /** Upper bound on AI checks per scan (secret triage and applicability together). */
   maxScanChecks: z.number().int().min(0).max(200),
+  /** Post the remarks of the pull request code review as inline comments on the changed lines. Optional so earlier clients keep working. */
+  prReviewInline: z.boolean().default(false),
 });
 export type AiSettingsInput = z.infer<typeof aiSettingsSchema>;
 
@@ -147,6 +149,7 @@ export const DEFAULT_AI_SETTINGS: Omit<AiSettingsInput, 'providers'> & { provide
   monthlyBudgetUsd: 50,
   maxContextChars: 12_000,
   maxScanChecks: 20,
+  prReviewInline: false,
 };
 
 /** What users without settings access need to know: which AI actions are available. */

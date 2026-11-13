@@ -66,7 +66,7 @@ export function getJson<T>(url: string, opts: { headers: Record<string, string>;
 }
 
 /** Like getJson, for calls that are not GETs (minting a GitHub App installation token, pull request comments). */
-export async function requestJson<T>(url: string, opts: { method?: 'GET' | 'POST' | 'PUT' | 'PATCH'; body?: unknown; headers: Record<string, string>; allowedOrigin: string; providerName: string }): Promise<JsonResponse<T>> {
+export async function requestJson<T>(url: string, opts: { method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'; body?: unknown; headers: Record<string, string>; allowedOrigin: string; providerName: string }): Promise<JsonResponse<T>> {
   let target = new URL(url);
   let res: Response;
   // Redirects are followed by hand, and only on the same origin, so credentials never go anywhere else
@@ -95,6 +95,8 @@ export async function requestJson<T>(url: string, opts: { method?: 'GET' | 'POST
     await res.body?.cancel().catch(() => undefined);
     throw new ProviderError(describeStatus(res, opts.providerName), res.status, [400, 401, 403, 404].includes(res.status) && res.headers.get('x-ratelimit-remaining') !== '0');
   }
+  // Deletions answer without a body.
+  if (res.status === 204) return { data: undefined as T, headers: res.headers };
   try {
     return { data: (await res.json()) as T, headers: res.headers };
   } catch {

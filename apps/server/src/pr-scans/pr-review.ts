@@ -25,6 +25,8 @@ export interface DiffFile {
   text: string;
   /** Line numbers of the new file that appear in the diff (added or context). */
   lines: Set<number>;
+  /** The subset of `lines` the pull request added or changed. */
+  addedLines: Set<number>;
   added: number;
 }
 
@@ -45,6 +47,7 @@ export function parseDiff(diff: string): { files: DiffFile[]; skipped: number } 
     }
     const out: string[] = [];
     const numbers = new Set<number>();
+    const addedLines = new Set<number>();
     let n = 0;
     let added = 0;
     let inHunk = false;
@@ -61,7 +64,10 @@ export function parseDiff(diff: string): { files: DiffFile[]; skipped: number } 
       if (!inHunk || !(isAdded || line.startsWith(' '))) continue;
       out.push(`${isAdded ? '+' : ' '} ${n}: ${line.slice(1, MAX_LINE_CHARS)}`);
       numbers.add(n);
-      if (isAdded) added++;
+      if (isAdded) {
+        added++;
+        addedLines.add(n);
+      }
       n++;
     }
     if (!added) {
@@ -70,7 +76,7 @@ export function parseDiff(diff: string): { files: DiffFile[]; skipped: number } 
     }
     let text = out.join('\n');
     if (text.length > MAX_FILE_DIFF_CHARS) text = `${text.slice(0, MAX_FILE_DIFF_CHARS)}\n   [... rest of this file's changes left out]`;
-    files.push({ path, text, lines: numbers, added });
+    files.push({ path, text, lines: numbers, addedLines, added });
   }
   return { files, skipped };
 }
@@ -134,8 +140,8 @@ export async function reviewPullRequest(input: ReviewInput, log: (m: string) => 
   const res = await ai.run({ useCase: 'pr_review', repo, actor: null, instructions: INSTRUCTIONS, prompt, knownSecrets: input.knownSecrets, output: PR_REVIEW_OUTPUT, subject: { type: 'pull_request', id: input.subjectId } });
 
   // Keep only remarks that point at a line the diff shows: a model can invent locations.
-  const valid = new Map(chosen.map((f) => [f.path, f.lines]));
-  const comments: PrReviewCommentDto[] = res.output.comments.filter((c) => valid.get(c.path)?.has(c.line));
+  const byPath = new Map(chosen.map((f) => [f.path, f]));
+  const comments: PrReviewCommentDto[] = res.output.comments.filter((c) => byPath.get(c.path)?.lines.has(c.line)).map((c) => ({ ...c, added: byPath.get(c.path)!.addedLines.has(c.line) }));
   const dropped = res.output.comments.length - comments.length;
   log(`AI code review: ${comments.length} remark(s) on ${chosen.length} file(s)${dropped ? `, ${dropped} dropped (not on a line of the diff)` : ''}${files.length > chosen.length ? `, ${files.length - chosen.length} file(s) did not fit` : ''}`);
   return { summary: res.output.summary, comments, filesReviewed: chosen.length, filesSkipped: skipped + (files.length - chosen.length), provider: res.provider, model: res.model };

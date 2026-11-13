@@ -50,6 +50,10 @@ export interface PrReviewCommentDto {
   category: (typeof PR_REVIEW_CATEGORIES)[number];
   severity: (typeof PR_REVIEW_SEVERITIES)[number];
   comment: string;
+  /** Whether the pull request added or changed this line (false: an unchanged line next to a change). */
+  added?: boolean;
+  /** Posted as an inline comment on the pull request. */
+  inline?: boolean;
 }
 
 /** The AI code review of a pull request: advisory, labelled with the model that wrote it, never part of the gate. */
@@ -59,6 +63,8 @@ export interface PrReviewDto {
   filesReviewed: number;
   /** Changed files left out (too large, generated, lock files, binary, or over the context limit). */
   filesSkipped: number;
+  /** Ids of the inline comments posted for this review, so the next scan can replace them. */
+  inlineIds?: string[];
   provider: string;
   model: string;
 }
