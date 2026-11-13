@@ -183,6 +183,10 @@ function PrScanModal({ scanId, onClose }: { scanId: string; onClose(): void }) {
               </div>
             </>
           )}
+          <details>
+            <summary className="cursor-pointer text-xs font-semibold tracking-wide text-slate-500 uppercase">Log</summary>
+            <pre className="mt-1 max-h-72 overflow-auto rounded-md bg-slate-950 p-3 font-mono text-xs leading-5 text-slate-200">{s.log?.join('\n') || 'No output yet.'}</pre>
+          </details>
           <p className="text-xs text-slate-500">
             Requested {formatDateTime(s.createdAt)}
             {s.finishedAt && ` · finished ${formatRelative(s.finishedAt)}`}. Pull request scans are a preview: their findings are not added to the repository.

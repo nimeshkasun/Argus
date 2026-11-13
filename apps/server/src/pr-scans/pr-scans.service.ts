@@ -112,7 +112,7 @@ export class PrScansService {
     const scan = await this.store.prScans.findById(id);
     if (!scan) throw new NotFoundException('Pull request scan not found.');
     const repo = await this.visibleRepo(scan.repoId, user);
-    return this.toDto(scan, repo.fullName);
+    return { ...this.toDto(scan, repo.fullName), log: scan.log };
   }
 
   async list(repoId: string, q: { page: number; pageSize: number }, user: User): Promise<Paged<PrScanDto>> {

@@ -13,7 +13,7 @@ A CI pipeline (GitHub Actions, Bitbucket Pipelines, Jenkins, …) can ask Argus 
 
 A pull request scan is a **preview**: its findings are not added to the repository, they open no tickets, and they do not change the dependency inventory. The repository's own scans (schedule, push, **Scan now**) remain the record. So that "new" means new, keep the repository's own scans running: the comparison is against its latest findings.
 
-Pull request scans appear on the repository page under **Pull requests**, with their result and a link to the comment. They are kept as long as scan runs (90 days by default).
+Pull request scans appear on the repository page under **Pull requests**, with their result and a link to the comment. Open one to see its **Log**: each step of the scan, including whether the comments could be posted. They are kept as long as scan runs (90 days by default).
 
 ## The comment
 
@@ -155,7 +155,8 @@ Needs `repos:read`. Returns the scan:
 - `status`: `queued`, `running`, `succeeded` or `failed`;
 - `gate`: `passed` or `failed`, once succeeded;
 - `result`: changed files, new-issue counts by severity, the new issues with their fixes, known and suppressed counts, per-scanner status, and `review` (the AI code review, when that feature is on);
-- `commentUrl`, `error`, and `argusUrl`.
+- `commentUrl`, `error`, and `argusUrl`;
+- `log`: what the scan did, step by step (also shown under **Log** when the scan is opened in Argus).
 
 `GET /api/v1/ci/pull-requests?repoId=<id>` lists a repository's pull request scans, newest first.
 

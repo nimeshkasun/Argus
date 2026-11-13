@@ -130,4 +130,6 @@ export interface PrScanDto {
   createdAt: string;
   startedAt: string | null;
   finishedAt: string | null;
+  /** What the scan did, step by step. Only on a single scan, not in lists. */
+  log?: string[];
 }
