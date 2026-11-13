@@ -2,7 +2,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { type AddressInfo } from 'node:net';
 
 export interface AiCall {
-  provider: 'anthropic' | 'openai' | 'gemini';
+  provider: 'anthropic' | 'openai' | 'gemini' | 'relay';
   headers: IncomingMessage['headers'];
   /** System and user text as sent. */
   text: string;
@@ -78,6 +78,14 @@ export function aiRoutes(calls: AiCall[], opts: MockAiOptions = {}) {
       const call: AiCall = { provider: 'openai', headers: req.headers, body: b, text: (b.messages ?? []).map((m: { content: string }) => m.content).join('\n') };
       calls.push(call);
       if (opts.status) return json({ error: { message: 'Incorrect API key provided' } }, opts.status);
+      return json({ model: b.model, choices: [{ message: { content: answer(kindOf(b.response_format?.json_schema?.schema), call) }, finish_reason: 'stop' }], usage: { prompt_tokens: 1000, completion_tokens: 200 } });
+    }
+    if (p === '/ai/relay/v1/chat/completions') {
+      const call: AiCall = { provider: 'relay', headers: req.headers, body: b, text: (b.messages ?? []).map((m: { content: string }) => m.content).join('\n') };
+      calls.push(call);
+      if (opts.status) return json({ error: { message: 'Invalid API key', type: 'invalid_request_error', code: 'invalid_api_key' } }, opts.status);
+      // Relay names the model that really answered (after routing) in a header; the body echoes the requested route.
+      res.setHeader('x-relay-model', 'openai/gpt-6.1-sol');
       return json({ model: b.model, choices: [{ message: { content: answer(kindOf(b.response_format?.json_schema?.schema), call) }, finish_reason: 'stop' }], usage: { prompt_tokens: 1000, completion_tokens: 200 } });
     }
     const gemini = /^\/ai\/gemini\/models\/([^/]+):generateContent$/.exec(p);

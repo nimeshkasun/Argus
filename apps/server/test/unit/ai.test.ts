@@ -103,6 +103,29 @@ describe('AI provider clients', () => {
     }
   });
 
+  it('relay adds /v1, reports the served model and tags the request', async () => {
+    const client = createAiClient('relay', { model: 'smart', apiKey: 'rly_test_key_123456', baseUrl: `${mock.url}/ai/relay/` });
+    const res = await client.generate(req);
+    expect(res).toMatchObject({ model: 'openai/gpt-6.1-sol', inputTokens: 1000, outputTokens: 200 });
+    const call = mock.calls.at(-1)!;
+    expect(call.provider).toBe('relay');
+    expect(call.headers.authorization).toBe('Bearer rly_test_key_123456');
+    expect(call.body).toMatchObject({ model: 'smart', relay: { cache: false, tags: ['app:argus'] }, response_format: { type: 'json_schema' } });
+  });
+
+  it('relay needs a base URL, and its errors never leak the key', async () => {
+    await expect(createAiClient('relay', { model: 'smart', apiKey: 'rly_test_key_123456', baseUrl: null }).generate(req)).rejects.toThrow(/base URL/);
+    const failing = await startMockAi({ status: 401 });
+    try {
+      const err = await createAiClient('relay', { model: 'smart', apiKey: 'rly_live_should_not_leak', baseUrl: `${failing.url}/ai/relay` }).generate(req).catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(IntegrationError);
+      expect((err as Error).message).not.toContain('rly_live_should_not_leak');
+      expect((err as IntegrationError).status).toBe(401);
+    } finally {
+      await failing.close();
+    }
+  });
+
   it('returns raw text so the caller can reject output that is not valid JSON', async () => {
     const client = createAiClient('openai', { model: 'bad-json', apiKey: 'k-12345678', baseUrl: `${mock.url}/ai/openai` });
     const res = await client.generate(req);

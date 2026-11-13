@@ -75,7 +75,7 @@ function ProviderCard({ name, form, saved, onChange }: { name: AiProvider; form:
           </div>
         )}
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Model" hint="Any model your account can use.">
+          <Field label="Model" hint={name === 'relay' ? 'A Relay route (smart, cheap, resilient) or a provider/model slug.' : 'Any model your account can use.'}>
             {(id) => (
               <>
                 <Input id={id} list={listId} value={form.model} onChange={(e) => onChange({ model: e.target.value })} required />
@@ -90,8 +90,8 @@ function ProviderCard({ name, form, saved, onChange }: { name: AiProvider; form:
           <Field label="API key" hint={saved.keyConfigured ? 'Leave empty to keep the stored key.' : 'Stored encrypted; never shown again.'}>
             {(id) => <Input id={id} type="password" autoComplete="new-password" value={form.apiKey} onChange={(e) => onChange({ apiKey: e.target.value, clearApiKey: false })} />}
           </Field>
-          <Field label="Base URL (optional)" hint="For a gateway or private endpoint. Empty uses the provider's public API.">
-            {(id) => <Input id={id} type="url" value={form.baseUrl} onChange={(e) => onChange({ baseUrl: e.target.value })} placeholder="https://" />}
+          <Field label="Base URL (optional)" hint={name === 'relay' ? 'Required: your Relay gateway, e.g. https://relay.example.com/v1.' : "For a gateway or private endpoint. Empty uses the provider's public API."}>
+            {(id) => <Input id={id} type="url" value={form.baseUrl} onChange={(e) => onChange({ baseUrl: e.target.value })} placeholder="https://" required={name === 'relay' && form.enabled} />}
           </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Input $ / 1M tokens" hint="Empty: built-in price list.">
@@ -187,7 +187,7 @@ export function AiSettingsPage() {
     <form onSubmit={submit} className="space-y-6">
       <PageHeader
         title="AI assistance"
-        description="Use Claude, OpenAI or Gemini to suggest fixes, draft Jira issues and emails, and triage findings."
+        description="Use Claude, OpenAI, Gemini or a Relay gateway to suggest fixes, draft Jira issues and emails, and triage findings."
         actions={
           <Button type="submit" loading={save.isPending}>
             Save

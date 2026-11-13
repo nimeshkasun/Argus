@@ -1,12 +1,13 @@
 import { z } from 'zod';
 
-export const AI_PROVIDERS = ['anthropic', 'openai', 'gemini'] as const;
+export const AI_PROVIDERS = ['anthropic', 'openai', 'gemini', 'relay'] as const;
 export type AiProvider = (typeof AI_PROVIDERS)[number];
 
 export const AI_PROVIDER_LABELS: Record<AiProvider, string> = {
   anthropic: 'Anthropic Claude',
   openai: 'OpenAI',
   gemini: 'Google Gemini',
+  relay: 'Relay gateway',
 };
 
 /** Public API endpoints; an administrator may point a provider at a compatible gateway instead. */
@@ -14,6 +15,8 @@ export const AI_DEFAULT_BASE_URLS: Record<AiProvider, string> = {
   anthropic: 'https://api.anthropic.com',
   openai: 'https://api.openai.com/v1',
   gemini: 'https://generativelanguage.googleapis.com/v1beta',
+  // Relay is self-hosted: there is no public endpoint. The base URL is required (https://<your-relay-host>/v1).
+  relay: '',
 };
 
 /** Suggested models. Administrators can enter any model their account offers. */
@@ -21,12 +24,15 @@ export const AI_DEFAULT_MODELS: Record<AiProvider, string> = {
   anthropic: 'claude-opus-5-5',
   openai: 'gpt-6.1-sol',
   gemini: 'gemini-3.8-flash',
+  // A Relay route (smart, cheap, resilient) or a model slug such as openai/gpt-6.1-sol.
+  relay: 'smart',
 };
 
 export const AI_SUGGESTED_MODELS: Record<AiProvider, string[]> = {
   anthropic: ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5', 'claude-fable-5-1'],
   openai: ['gpt-6.1-sol', 'gpt-6-astra', 'gpt-6-luna'],
   gemini: ['gemini-3.8-flash', 'gemini-4-argon', 'gemini-3.1-flash-lite'],
+  relay: ['smart', 'cheap', 'resilient'],
 };
 
 /**
@@ -92,7 +98,10 @@ const useCaseSettings = z.object({
 export const aiSettingsSchema = z.object({
   enabled: z.boolean(),
   defaultProvider: z.enum(AI_PROVIDERS),
-  providers: z.object({ anthropic: providerInput, openai: providerInput, gemini: providerInput }),
+  providers: z.object({ anthropic: providerInput, openai: providerInput, gemini: providerInput,
+    // Added with the Relay gateway; optional so earlier clients keep working.
+    relay: providerInput.default({ enabled: false, model: AI_DEFAULT_MODELS.relay, baseUrl: null, inputPricePerMTok: null, outputPricePerMTok: null }),
+  }),
   useCases: z.object({ remediation: useCaseSettings, ticket_draft: useCaseSettings, secret_triage: useCaseSettings, vuln_applicability: useCaseSettings,
     // Added in Phase 5; optional so earlier clients keep working.
     advisory_extraction: useCaseSettings.default({ enabled: false, provider: null }),
@@ -123,7 +132,7 @@ const defaultProvider = (p: AiProvider): AiProviderSettings => ({ enabled: false
 export const DEFAULT_AI_SETTINGS: Omit<AiSettingsInput, 'providers'> & { providers: Record<AiProvider, AiProviderSettings> } = {
   enabled: false,
   defaultProvider: 'anthropic',
-  providers: { anthropic: defaultProvider('anthropic'), openai: defaultProvider('openai'), gemini: defaultProvider('gemini') },
+  providers: { anthropic: defaultProvider('anthropic'), openai: defaultProvider('openai'), gemini: defaultProvider('gemini'), relay: defaultProvider('relay') },
   useCases: {
     remediation: { enabled: true, provider: null },
     ticket_draft: { enabled: true, provider: null },

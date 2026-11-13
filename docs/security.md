@@ -21,7 +21,7 @@ If you find a vulnerability, please report it privately to the maintainers rathe
 | **Authenticated encryption.** Stored secrets are encrypted with AES-256-GCM, using a fresh random 96-bit IV per value and a versioned envelope (`v1.iv.tag.ciphertext`). Any tampering is detected on decryption. This covers TOTP secrets, source-control tokens, webhook secrets, integration credentials and AI provider keys. | ✅ |
 | GitHub and Bitbucket access tokens and per-source webhook secrets are stored with this encryption. | ✅ |
 | SMTP passwords, Microsoft Graph and OAuth2 client secrets, Teams/Slack webhook URLs, webhook signing secrets and Jira tokens are stored with the same encryption, and are write-only: the API shows only a hint (`••••abcd` or the webhook host). | ✅ |
-| AI provider keys (Anthropic, OpenAI, Gemini) are stored with the same encryption and are write-only (`••••abcd`). They are sent only to the provider's configured endpoint, never logged, and redacted from any error message. | ✅ |
+| AI provider keys (Anthropic, OpenAI, Gemini, Relay) are stored with the same encryption and are write-only (`••••abcd`). They are sent only to the provider's configured endpoint, never logged, and redacted from any error message. | ✅ |
 | **Master-key rotation** (`rotate-master-key` CLI) re-encrypts every stored credential with a new key and keeps keyed hashes valid; it is idempotent and reports anything it cannot decrypt. See [Docker deployment](deployment/docker.md#rotating-the-master-key). | ✅ |
 | **Credential inventory** records what a credential is, its owner and expiry, never its value. The Microsoft Entra ID import secret is encrypted and write-only, and Graph paging links are followed only on the Graph host. | ✅ |
 | **Write-only credentials.** The API never returns a stored credential; for source tokens it shows only the last four characters (`••••abcd`). Changing a token or connection setting re-tests the connection before saving. A webhook secret is shown once, when it is created or rotated. | ✅ |
@@ -114,7 +114,7 @@ If you find a vulnerability, please report it privately to the maintainers rathe
 
 ## 7. AI guardrails
 
-AI features are optional and switched off until an administrator configures a provider (Anthropic Claude, OpenAI or Google Gemini). Every request goes through one gateway (`AiService`) that applies all of the controls below; no feature can call a provider directly. Details: [AI assistance](features/ai-assistance.md).
+AI features are optional and switched off until an administrator configures a provider (Anthropic Claude, OpenAI, Google Gemini or a self-hosted Relay gateway). Every request goes through one gateway (`AiService`) that applies all of the controls below; no feature can call a provider directly. Details: [AI assistance](features/ai-assistance.md).
 
 | Control | Status |
 |---|---|
@@ -125,7 +125,7 @@ AI features are optional and switched off until an administrator configures a pr
 | **Humans decide.** AI output is always labelled *AI-assisted* with the model and its reasoning. AI can suggest a fix or flag a likely false positive, but it **never changes a ticket's status, suppresses a finding or alters a risk score**. Drafts are only filled into a form for a person to edit and send. | ✅ |
 | **Strict output validation.** Providers are asked for JSON matching a schema, and every answer is validated again in Argus (required fields, ranges, allowed verdicts). Anything else is discarded and counted as a failure. | ✅ |
 | **Prompt-injection mitigation.** Repository and advisory content is wrapped in tags, and the model is told to treat it as untrusted data and not follow instructions in it. Since this cannot be guaranteed, AI output is advisory only (see *Humans decide*). | ✅ |
-| **Hardened provider calls.** Custom endpoints must be HTTPS (plain HTTP only on loopback), redirects are refused for OpenAI and Gemini, and requests time out after 2 minutes. `ARGUS_OFFLINE=true` blocks the providers' public APIs; only a configured private endpoint stays usable. Generating suggestions and drafts is rate-limited (10/min per client). | ✅ |
+| **Hardened provider calls.** Custom endpoints must be HTTPS (plain HTTP only on loopback), redirects are refused for OpenAI, Gemini and Relay, and requests time out after 2 minutes. `ARGUS_OFFLINE=true` blocks the providers' public APIs; only a configured private endpoint stays usable. Generating suggestions and drafts is rate-limited (10/min per client). | ✅ |
 | Every AI request is audited (see [Audit trail](#5-audit-trail)); prompt and answer contents are not logged. | ✅ |
 | **AI extraction of advisories from security news** sees only the news item (title, link, text), never repository content. Proposals land in a review queue; auto-approval is off by default and, when enabled, only applies above a confidence threshold and is audited. Proposals with unparseable version ranges or malformed CVE ids are dropped before review. | ✅ |
 

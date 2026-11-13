@@ -76,7 +76,7 @@ See [AI assistance](ai-assistance.md).
 
 | Feature | Status |
 |---|---|
-| Choice of provider (Anthropic Claude, OpenAI, Google Gemini), configured by an administrator, with optional private endpoints and per-feature routing | ✅ |
+| Choice of provider (Anthropic Claude, OpenAI, Google Gemini, Relay gateway), configured by an administrator, with optional private endpoints and per-feature routing | ✅ |
 | AI remediation suggestions on tickets (regenerate, post as comment) | ✅ |
 | AI drafting of Jira issues and ticket emails | ✅ |
 | AI triage during scans: likely false-positive secrets, and whether a vulnerable package is used in an affected way | ✅ |

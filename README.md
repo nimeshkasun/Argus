@@ -14,7 +14,7 @@ Each finding gets a risk score and becomes a ticket inside Argus. From a ticket 
 
 - send email alerts
 - raise a Jira issue
-- ask an AI model (Claude, OpenAI or Gemini) for remediation advice
+- ask an AI model (Claude, OpenAI, Gemini or a Relay gateway) for remediation advice
 
 A threat-intelligence feed keeps Argus up to date with newly published vulnerabilities.
 
@@ -49,7 +49,7 @@ If you prefer MongoDB, use `deploy/docker/docker-compose.mongo.yml` instead.
 | [Threat intelligence](docs/features/threat-intelligence.md) | Security news with AI extraction and review, Argus advisories, continuous re-matching, NVD |
 | [Dashboards, reports and credentials](docs/features/dashboards-and-reports.md) | Trends, MTTR, SLA compliance, printable reports, credential inventory with Entra ID import, data retention |
 | [API and automation](docs/features/api-and-automation.md) | Personal API tokens, OpenAPI, Prometheus metrics |
-| [AI assistance](docs/features/ai-assistance.md) | Claude, OpenAI or Gemini: fix suggestions, drafts, scan triage, and what is (and is never) sent |
+| [AI assistance](docs/features/ai-assistance.md) | Claude, OpenAI, Gemini or Relay: fix suggestions, drafts, scan triage, and what is (and is never) sent |
 | [Configuration](docs/configuration.md) | Every environment variable and in-app setting |
 | [Docker deployment](docs/deployment/docker.md) | Compose, scaling out, backups |
 | [Azure Web App deployment](docs/deployment/azure.md) | Running the image on Azure App Service |

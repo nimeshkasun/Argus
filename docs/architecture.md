@@ -170,7 +170,7 @@ feature (ticket suggestion, draft, scan triage)
 AiService ── switches: AI on? feature on? repository opted in? provider configured? budget left?
    │        redact secrets ─► cap context ─► add untrusted-data preamble
    ▼
-provider client (Anthropic SDK · OpenAI Chat Completions · Gemini generateContent), JSON-schema output
+provider client (Anthropic SDK · OpenAI Chat Completions · Gemini generateContent · Relay, OpenAI-compatible), JSON-schema output
    │
    ▼
 validate answer (zod) ─► record usage + cost ─► audit (no content) ─► return / store insight

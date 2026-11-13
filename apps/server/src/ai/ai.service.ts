@@ -116,6 +116,7 @@ export class AiService {
       if (apiKey || (clearApiKey && prev.keyEnc)) keysChanged.push(p);
       providers[p] = { ...rest, baseUrl: rest.baseUrl?.replace(/\/+$/, '') ?? null, keyEnc, keyHint: apiKey ? `••••${apiKey.slice(-4)}` : keyEnc ? prev.keyHint : null };
       if (rest.enabled && !keyEnc) throw new BadRequestException(`Enter an API key for ${p} before enabling it.`);
+      if (p === 'relay' && rest.enabled && !providers[p].baseUrl) throw new BadRequestException('Enter the base URL of your Relay gateway before enabling it.');
     }
     if (input.enabled && !providers[input.defaultProvider].enabled) throw new BadRequestException('The default provider must be enabled.');
     const value: StoredAi = { ...input, providers };

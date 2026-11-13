@@ -20,6 +20,7 @@ AI is **off by default**. Nothing is sent to an AI provider until an administrat
 | Anthropic Claude | Messages API (official Anthropic SDK) | JSON schema (`output_config.format`) |
 | OpenAI | Chat Completions | JSON schema, strict mode |
 | Google Gemini | `generateContent` | JSON schema (`responseJsonSchema`) |
+| Relay | [Relay](https://github.com/nimeshkasun/Relay) gateway, OpenAI-compatible `/v1/chat/completions` | JSON schema, strict mode |
 
 Configure them under **Administration → AI assistance**:
 
@@ -32,6 +33,18 @@ Configure them under **Administration → AI assistance**:
 You choose a **default provider**, and can route each feature to a different one. For example, you might use a fast, inexpensive model for scan triage and a stronger one for remediation advice.
 
 On the public Claude API, requests to `claude-opus-5-5`, `claude-opus-5`, `claude-fable-5-1` and `claude-sonnet-5-5` use Anthropic's server-side fallback: if the model declines a request, Anthropic re-runs it on a suitable fallback model. The answer is labelled with the model that actually produced it. Fallback is not requested when a custom base URL is set.
+
+### Relay gateway
+
+[Relay](https://github.com/nimeshkasun/Relay) is a self-hosted, OpenAI-compatible LLM gateway that routes to local and cloud models and adds its own budgets, guardrails and audit log. To use it:
+
+- **Base URL (required).** The address of your Relay instance, such as `https://relay.example.com/v1`. `/v1` is added when you leave it out. There is no public Relay endpoint, so Relay stays usable in offline mode.
+- **API key.** A Relay key (`rly_…`), sent as a bearer token.
+- **Model.** A Relay route (`smart`, `cheap`, `resilient`) or a `provider/model` slug from your gateway's `GET /v1/models`. Defaults to `smart`.
+- **Prices.** Relay routes are not in Argus's price list, so enter the per-million-token prices if you want Argus's budget to count Relay requests. Relay's own spend caps apply regardless.
+- Requests are tagged `app:argus` for Relay's reports and bypass Relay's response cache. The answer is labelled with the model Relay reports it used (`x-relay-model`), which can differ from the route you chose.
+
+Argus's own guardrails (secret redaction, context cap, repository opt-out, schema validation, budget and audit) apply before a request reaches Relay, in addition to any guardrails configured in Relay.
 
 ## Features and switches
 
@@ -87,6 +100,7 @@ Behind a proxy, set `HTTPS_PROXY` and `NODE_USE_ENV_PROXY=1`. To allow-list outb
 - `api.anthropic.com`
 - `api.openai.com`
 - `generativelanguage.googleapis.com`
+- the host of your Relay gateway, if you use one
 
 ## Permissions
 

@@ -91,15 +91,25 @@ function anthropicError(err: unknown, apiKey: string): Error {
 
 /** OpenAI Chat Completions with a strict JSON schema response format. Works with OpenAI-compatible gateways. */
 class OpenAiClient implements AiClient {
-  readonly provider = 'openai' as const;
+  readonly provider: AiProvider = 'openai';
+  protected readonly label: string = 'OpenAI';
 
-  constructor(private readonly opts: AiClientOptions) {}
+  constructor(protected readonly opts: AiClientOptions) {}
+
+  /** Extra top-level request fields (gateway extensions). */
+  protected extraBody(): Record<string, unknown> {
+    return {};
+  }
+
+  protected endpoint(): string {
+    return (this.opts.baseUrl ?? AI_DEFAULT_BASE_URLS.openai).replace(/\/+$/, '');
+  }
 
   async generate(req: AiRequest): Promise<AiResponse> {
-    const base = (this.opts.baseUrl ?? AI_DEFAULT_BASE_URLS.openai).replace(/\/+$/, '');
-    const res = await withKey(this.opts.apiKey, 'OpenAI', () =>
+    const base = this.endpoint();
+    const res = await withKey(this.opts.apiKey, this.label, () =>
       callExternal(`${base}/chat/completions`, {
-        service: 'OpenAI',
+        service: this.label,
         method: 'POST',
         timeoutMs: TIMEOUT_MS,
         headers: { Authorization: `Bearer ${this.opts.apiKey}`, 'Content-Type': 'application/json' },
@@ -111,6 +121,7 @@ class OpenAiClient implements AiClient {
           ],
           max_completion_tokens: MAX_TOKENS,
           response_format: { type: 'json_schema', json_schema: { name: req.schemaName, strict: true, schema: req.schema } },
+          ...this.extraBody(),
         }),
       }),
     );
@@ -120,9 +131,32 @@ class OpenAiClient implements AiClient {
       usage?: { prompt_tokens?: number; completion_tokens?: number };
     };
     const choice = body.choices?.[0];
-    if (choice?.message?.refusal) throw new AiOutputError('OpenAI declined the request.');
+    if (choice?.message?.refusal) throw new AiOutputError(`${this.label} declined the request.`);
     if (choice?.finish_reason === 'length') throw new AiOutputError('The answer was cut off at the output token limit.');
-    return { text: choice?.message?.content ?? '', model: body.model ?? this.opts.model, inputTokens: body.usage?.prompt_tokens ?? 0, outputTokens: body.usage?.completion_tokens ?? 0 };
+    // Relay reports the model that really served the request (after routing or fallback) in a header.
+    const served = res.headers.get('x-relay-model');
+    return { text: choice?.message?.content ?? '', model: served || body.model || this.opts.model, inputTokens: body.usage?.prompt_tokens ?? 0, outputTokens: body.usage?.completion_tokens ?? 0 };
+  }
+}
+
+/**
+ * Relay (https://github.com/nimeshkasun/Relay): a self-hosted, OpenAI-compatible LLM gateway. Same wire format as
+ * OpenAI; the base URL is the gateway's /v1 endpoint, the key is a Relay key (rly_...), and the model is a Relay
+ * route (smart, cheap, resilient) or a provider/model slug.
+ */
+class RelayClient extends OpenAiClient {
+  override readonly provider = 'relay' as const;
+  protected override readonly label = 'Relay';
+
+  protected override endpoint(): string {
+    const base = (this.opts.baseUrl ?? '').replace(/\/+$/, '');
+    if (!base) throw new IntegrationError('Relay needs a base URL: the address of your Relay gateway, for example https://relay.example.com/v1.');
+    return /\/v1$/.test(base) ? base : `${base}/v1`;
+  }
+
+  // Tag requests for Relay's own reports, and skip its response cache so every answer is fresh and counted.
+  protected override extraBody(): Record<string, unknown> {
+    return { relay: { tags: ['app:argus'], cache: false } };
   }
 }
 
@@ -183,5 +217,7 @@ export function createAiClient(provider: AiProvider, opts: AiClientOptions): AiC
       return new OpenAiClient(opts);
     case 'gemini':
       return new GeminiClient(opts);
+    case 'relay':
+      return new RelayClient(opts);
   }
 }
