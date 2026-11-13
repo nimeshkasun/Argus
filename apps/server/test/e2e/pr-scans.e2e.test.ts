@@ -37,6 +37,8 @@ describe.each(dbHarnesses())('pull request scans from CI e2e: $name', (h) => {
   let reviewThread: { id: number; in_reply_to_id?: number; reactions?: { total_count: number } }[] = [];
   /** Inline review comments created and deleted on the pull request. */
   const inline: { method: string; id: number; body: Record<string, unknown> }[] = [];
+  /** Reviews submitted on the pull request ("request changes"). */
+  const reviews: Record<string, unknown>[] = [];
 
   /** Commits a pull request branch on top of main and publishes it as refs/pull/7/head, like GitHub does. */
   const pushPullRequest = (files: Record<string, string>, message: string) => {
@@ -80,6 +82,10 @@ describe.each(dbHarnesses())('pull request scans from CI e2e: $name', (h) => {
       const id = 9000 + inline.length;
       inline.push({ method: 'POST', id, body: JSON.parse(body) as Record<string, unknown> });
       return json({ id }, 201);
+    }
+    if (req.method === 'POST' && p === '/api/v3/repos/acme/shop/pulls/7/reviews') {
+      reviews.push(JSON.parse(body) as Record<string, unknown>);
+      return json({ id: 7000 + reviews.length });
     }
     const del = /^\/api\/v3\/repos\/acme\/shop\/pulls\/comments\/(\d+)$/.exec(p);
     if (req.method === 'DELETE' && del) {
@@ -262,6 +268,8 @@ describe.each(dbHarnesses())('pull request scans from CI e2e: $name', (h) => {
     expect(audit.items[0].details).toMatchObject({ useCase: 'pr_review', provider: 'relay', repo: 'acme/shop', outcome: 'ok' });
     // Inline comments are off unless an administrator turns them on.
     expect(inline).toEqual([]);
+    // So is requesting changes: neither the scanner findings of the earlier scans nor this review's remark did.
+    expect(reviews).toEqual([]);
   });
 
   it('reviews a pull request once: later pushes keep the first review and post nothing new', async () => {
@@ -272,12 +280,12 @@ describe.each(dbHarnesses())('pull request scans from CI e2e: $name', (h) => {
     expect(comments.at(-1)!.body).toContain('AI code review (1 remark)');
   });
 
-  it('posts the review remarks as inline comments when that is turned on, and reviews every push when asked to', async () => {
+  it('posts the review remarks as inline comments and requests changes when those are turned on, and reviews every push when asked to', async () => {
     const current = (await admin.call('get', '/api/v1/settings/ai')).body;
     expect(current.prReviewEveryPush).toBe(false);
-    const saved = await admin.call('put', '/api/v1/settings/ai', { ...current, prReviewInline: true, prReviewEveryPush: true });
+    const saved = await admin.call('put', '/api/v1/settings/ai', { ...current, prReviewInline: true, prReviewEveryPush: true, prReviewRequestChanges: true });
     expect(saved.status).toBe(200);
-    expect(saved.body).toMatchObject({ prReviewInline: true, prReviewEveryPush: true });
+    expect(saved.body).toMatchObject({ prReviewInline: true, prReviewEveryPush: true, prReviewRequestChanges: true });
 
     const first = await finished((await ci('post', '/api/v1/ci/pull-requests', { repository: 'acme/shop', pullRequest: 7 })).body.id);
     expect(first).toMatchObject({ status: 'succeeded', gate: 'passed' });
@@ -290,6 +298,9 @@ describe.each(dbHarnesses())('pull request scans from CI e2e: $name', (h) => {
     const body = comments.at(-1)!.body;
     expect(body).toContain('1 remark is posted as inline comment on the changed lines.');
     expect(body).not.toContain('Export a function that reads the token');
+    // The review left a remark, so the pull request is marked as needing changes, after the comments.
+    expect(reviews).toEqual([{ commit_id: prHead, event: 'REQUEST_CHANGES', body: expect.stringContaining('left 1 remark to look at: see the inline comments') }]);
+    expect(first.result!.review!.changesRequested).toBe(true);
 
     // The next push is reviewed again: its remarks are added, and the earlier comments are left alone.
     const second = await finished((await ci('post', '/api/v1/ci/pull-requests', { repository: 'acme/shop', pullRequest: 7 })).body.id);
@@ -300,6 +311,8 @@ describe.each(dbHarnesses())('pull request scans from CI e2e: $name', (h) => {
     expect((await admin.call('put', '/api/v1/settings/ai', { ...saved.body, prReviewEveryPush: false })).status).toBe(200);
     const third = await finished((await ci('post', '/api/v1/ci/pull-requests', { repository: 'acme/shop', pullRequest: 7 })).body.id);
     expect(inline).toHaveLength(2);
+    // A review kept from an earlier scan does not request changes again.
+    expect(reviews).toHaveLength(2);
     expect(third.result!.review!.inlineIds).toEqual(['9001']);
   });
 });

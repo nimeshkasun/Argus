@@ -65,6 +65,8 @@ export interface PrReviewDto {
   filesSkipped: number;
   /** Ids of the inline comments posted for this review, so the next scan can replace them. */
   inlineIds?: string[];
+  /** Argus marked the pull request as "changes requested" because of this review's remarks. */
+  changesRequested?: boolean;
   provider: string;
   model: string;
 }

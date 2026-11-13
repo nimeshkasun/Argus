@@ -119,6 +119,8 @@ export const aiSettingsSchema = z.object({
   prReviewInline: z.boolean().default(false),
   /** Review a pull request again on every push. Off: only its first scan is reviewed, and later scans keep that review. Optional so earlier clients keep working. */
   prReviewEveryPush: z.boolean().default(false),
+  /** Mark the pull request as "changes requested" when the code review leaves remarks. Optional so earlier clients keep working. */
+  prReviewRequestChanges: z.boolean().default(false),
 });
 export type AiSettingsInput = z.infer<typeof aiSettingsSchema>;
 
@@ -153,6 +155,7 @@ export const DEFAULT_AI_SETTINGS: Omit<AiSettingsInput, 'providers'> & { provide
   maxScanChecks: 20,
   prReviewInline: false,
   prReviewEveryPush: false,
+  prReviewRequestChanges: false,
 };
 
 /** What users without settings access need to know: which AI actions are available. */

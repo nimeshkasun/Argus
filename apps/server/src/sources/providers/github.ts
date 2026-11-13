@@ -261,6 +261,11 @@ export class GitHubClient implements ProviderClient {
     return out;
   }
 
+  async requestChanges(fullName: string, number: number, review: { commitSha: string; body: string }): Promise<void> {
+    // A review needs a body to request changes.
+    await this.request<unknown>(this.url(`${this.repoPath(fullName)}/pulls/${number}/reviews`), await this.accessToken(), 'POST', { commit_id: review.commitSha, event: 'REQUEST_CHANGES', body: review.body });
+  }
+
   async deleteInlineComment(fullName: string, _number: number, id: string): Promise<void> {
     if (!/^\d+$/.test(id)) return;
     try {

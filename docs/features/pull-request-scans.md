@@ -42,7 +42,7 @@ Turn on **Pull request code review** under **Administration → AI**. Argus then
 - **What is sent.** Those diff lines, the pull request title and the titles of the issues the scanners found (so the review does not repeat them). Secrets are redacted first, as in every AI request.
 - **Where it shows.** An **AI code review** section in the same pull request comment: a short summary, then up to 10 remarks, each with a severity (*issue*, *suggestion*, *nitpick*), a category, and a link to the file and line. Remarks that point at a line the diff does not contain are dropped. The same review is shown on the scan in Argus and in the API result as `review`.
 - **Once per pull request, or on every push.** By default the review runs on the first scan of a pull request only. Later pushes are scanned as usual, but they keep that first review, in the summary comment and in the scan result, and post no new remarks. If the first review failed, the next scan tries again. To review every push instead, turn on **Review every push** under the feature's switch (`prReviewEveryPush` in the AI settings).
-- **It is advisory.** The review never changes the gate, opens no tickets and stores no findings. It is labelled with the model that wrote it. If the AI provider fails, or the budget is used up, the scan still completes without a review.
+- **It is advisory.** The review never changes the gate, opens no tickets and stores no findings. It leaves the pull request's review state alone too, unless **Request changes** (below) is on. It is labelled with the model that wrote it. If the AI provider fails, or the budget is used up, the scan still completes without a review.
 
 ### Inline comments
 
@@ -52,6 +52,15 @@ By default the remarks are listed in the summary comment. Turn on **Post remarks
 - Inline comments from earlier scans are never removed. With **Review every push** on, each new review adds its remarks next to them, so the same remark can appear more than once on a line.
 - A remark that cannot be posted inline (no permission, or the provider does not accept the line) is listed in the summary comment instead.
 - It needs the same permission as the summary comment (see **Let Argus comment** below). Requests made with `"comment": false` post no inline comments either.
+
+### Request changes
+
+Turn on **Request changes when there are remarks** (under the feature's switch, `prReviewRequestChanges` in the AI settings) to have Argus mark the pull request as needing changes when a review leaves at least one remark. It does so last, after the inline comments and the summary comment are posted: a **Request changes** review on GitHub, **Changes requested** on Bitbucket Cloud, **Needs work** on Bitbucket Data Center.
+
+- Only the code review's remarks count. New scanner findings alone (vulnerabilities, secrets, …) never request changes: the gate covers those. A review without remarks does not either.
+- It happens when a review is made. With **Review every push** off, later scans keep the first review and do not request changes again.
+- Argus does not withdraw the request. A person dismisses the review (GitHub) or the author asks for a new review once the remarks are handled. If approvals are required to merge, a standing request blocks the merge until then.
+- It needs the same permission as the summary comment. The provider refuses it when the credentials belong to the pull request's author; on Bitbucket Data Center they must belong to a user (not a project or repository access token). A refusal is recorded in the scan's log and changes nothing else. Requests made with `"comment": false` never request changes.
 
 It needs one extra fetch of the base branch per scan and one AI request per reviewed scan. The usual AI controls apply: the repository's AI opt-out, the monthly budget, and the audit log (`ai.request`, use case `pr_review`).
 

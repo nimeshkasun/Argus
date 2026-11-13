@@ -257,6 +257,12 @@ export function AiSettingsPage() {
                       checked={f.prReviewInline}
                       onChange={(e) => setF({ ...f, prReviewInline: e.target.checked })}
                     />
+                    <Checkbox
+                      label="Request changes when there are remarks"
+                      description="When a review leaves remarks, Argus marks the pull request as changes requested (Needs work on Bitbucket Data Center) after commenting. Scanner findings alone never do."
+                      checked={f.prReviewRequestChanges}
+                      onChange={(e) => setF({ ...f, prReviewRequestChanges: e.target.checked })}
+                    />
                   </div>
                 )}
               </div>

@@ -174,6 +174,11 @@ export class BitbucketCloudClient implements ProviderClient {
     return out;
   }
 
+  async requestChanges(fullName: string, number: number): Promise<void> {
+    // Bitbucket Cloud records the state only; the remarks are in the comments.
+    await this.send<unknown>(`${this.repoUrl(fullName)}/pullrequests/${number}/request-changes`, 'POST', undefined);
+  }
+
   async deleteInlineComment(fullName: string, number: number, id: string): Promise<void> {
     if (!/^\d+$/.test(id)) return;
     try {
@@ -352,9 +357,17 @@ export class BitbucketServerClient implements ProviderClient {
     return out;
   }
 
+  async requestChanges(fullName: string, number: number): Promise<void> {
+    // The status belongs to a participant: the user the credentials act as, which the server names on every response.
+    const pr = `${this.repoUrl(fullName)}/pull-requests/${number}`;
+    const user = (await this.get<unknown>(pr)).headers.get('x-ausername');
+    if (!user) throw new ProviderError('Bitbucket Data Center did not say which user the token belongs to, so the pull request cannot be marked "Needs work". Use a user\'s HTTP access token.', null, true);
+    await this.send<unknown>(`${pr}/participants/${encodeURIComponent(user)}`, 'PUT', { status: 'NEEDS_WORK' });
+  }
+
   async deleteInlineComment(fullName: string, number: number, id: string): Promise<void> {
     if (!/^\d+$/.test(id)) return;
-    const url = `${this.repoUrl(fullName)}/pull-requests/${number}/comments/${id}`;
+    const url =`${this.repoUrl(fullName)}/pull-requests/${number}/comments/${id}`;
     try {
       // Deletions must name the comment's current version.
       const { data: current } = await this.get<{ version: number }>(url);

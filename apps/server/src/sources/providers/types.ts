@@ -71,6 +71,12 @@ export interface ProviderClient {
    * when a new scan replaces the earlier comments. Reactions alone do not keep a comment.
    */
   discussedInlineComments(fullName: string, number: number, ids: string[]): Promise<Set<string>>;
+  /**
+   * Marks the pull request as needing changes, as a reviewer would: a "Request changes" review on GitHub, "Changes
+   * requested" on Bitbucket Cloud, "Needs work" on Bitbucket Data Center. `body` is the review's text where the
+   * provider shows one.
+   */
+  requestChanges(fullName: string, number: number, review: { commitSha: string; body: string }): Promise<void>;
   /** Removes an inline comment Argus posted earlier. Missing comments are not an error. */
   deleteInlineComment(fullName: string, number: number, id: string): Promise<void>;
 }

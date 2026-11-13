@@ -162,6 +162,9 @@ export class PrScanExecutor implements OnModuleInit {
       const patch: PrScanPatch = { status: 'succeeded', headSha, result };
       if (scan.comment && review) await this.inlineComments(scan, repo.fullName, client, headSha, review, log);
       if (scan.comment) Object.assign(patch, await this.comment(scan, repo.fullName, source.provider, repo.htmlUrl, headSha, result, log));
+      // Last, once everything is on the pull request. Only a review made by this scan counts: scanner findings
+      // alone, or a review kept from an earlier scan, never request changes.
+      if (scan.comment && review?.comments.length) await this.requestChanges(scan, repo.fullName, client, headSha, review, log);
       await finish(patch);
     } catch (err) {
       const permanent = (err instanceof ProviderError && err.permanent) || (err instanceof GitError && /authentication failed|could not read username|not found|couldn't find remote ref|403/i.test(err.message));
@@ -203,6 +206,24 @@ export class PrScanExecutor implements OnModuleInit {
     }
     review.inlineIds = ids;
     if (review.comments.length) log(`Posted ${ids.length} of ${review.comments.length} review remark(s) as inline comments${failure ? `; the rest stay in the summary comment (${failure})` : ''}`);
+  }
+
+  /**
+   * With "request changes" on, marks the pull request as needing changes when the AI code review left remarks.
+   * Never fails the scan.
+   */
+  private async requestChanges(scan: PrScan, fullName: string, client: ProviderClient, headSha: string, review: PrReviewDto, log: (m: string) => void): Promise<void> {
+    if (!(await this.ai.getSettings()).prReviewRequestChanges) return;
+    const n = review.comments.length;
+    const inline = review.comments.filter((c) => c.inline).length;
+    const where = inline === n ? 'the inline comments' : inline ? 'the inline comments and the Argus summary comment' : 'the Argus summary comment';
+    try {
+      await client.requestChanges(fullName, scan.number, { commitSha: headSha, body: `Argus's AI code review left ${n} remark${n === 1 ? '' : 's'} to look at: see ${where}. The review can be wrong: dismiss it if the remarks do not apply.` });
+      review.changesRequested = true;
+      log('Requested changes on the pull request');
+    } catch (err) {
+      log(`Could not request changes on the pull request: ${err instanceof Error ? err.message : String(err)}`);
+    }
   }
 
   /** Posts the summary comment, or updates the one an earlier scan of this pull request posted. Never fails the scan. */
