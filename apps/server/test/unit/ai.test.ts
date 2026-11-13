@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { REMEDIATION_OUTPUT } from '../../src/ai/output-schemas';
-import { AiOutputError, createAiClient } from '../../src/ai/providers';
+import { AiOutputError, createAiClient, extractJsonObject } from '../../src/ai/providers';
 import { capText, describeSecret, redactForPrompt } from '../../src/ai/redaction';
 import { IntegrationError } from '../../src/integrations/outbound';
 import { startMockAi } from '../e2e/mock-ai';
@@ -111,6 +111,34 @@ describe('AI provider clients', () => {
     expect(call.provider).toBe('relay');
     expect(call.headers.authorization).toBe('Bearer rly_test_key_123456');
     expect(call.body).toMatchObject({ model: 'smart', relay: { cache: false, tags: ['app:argus'] }, response_format: { type: 'json_schema' } });
+  });
+
+  it('relay states the schema in the prompt and accepts JSON wrapped in prose or a code fence', async () => {
+    const answer = { summary: 'Upgrade lodash.', steps: ['Run npm install lodash@4.17.21'], fixVersion: '4.17.21', breakingChangeRisk: 'low', rationale: 'Patch release.', confidence: 0.9 };
+    const wrapped = await startMockAi({ answer: () => `The fix is a patch upgrade {see below}.\n\n\`\`\`json\n${JSON.stringify(answer, null, 2)}\n\`\`\`` });
+    try {
+      const res = await createAiClient('relay', { model: 'anthropic/claude-sonnet-5-5', apiKey: 'rly_test_key_123456', baseUrl: `${wrapped.url}/ai/relay` }).generate(req);
+      expect(REMEDIATION_OUTPUT.validate.parse(JSON.parse(res.text))).toMatchObject({ fixVersion: '4.17.21' });
+      const system = (wrapped.calls.at(-1)!.body.messages as { role: string; content: string }[])[0].content;
+      expect(system).toContain('sys');
+      expect(system).toContain('"breakingChangeRisk"');
+      expect(system).toMatch(/one JSON object and nothing else/);
+      // OpenAI itself enforces the schema, so its prompt and answer are left alone.
+      const plain = await createAiClient('openai', { model: 'gpt-6.1-sol', apiKey: 'k-12345678', baseUrl: `${wrapped.url}/ai/openai` }).generate(req);
+      expect(plain.text).toContain('```json');
+      expect((wrapped.calls.at(-1)!.body.messages as { content: string }[])[0].content).toBe('sys');
+    } finally {
+      await wrapped.close();
+    }
+  });
+
+  it('extracts a JSON object from a wrapped answer and leaves anything else unchanged', () => {
+    expect(extractJsonObject(' {"a":1} ')).toBe('{"a":1}');
+    expect(extractJsonObject('Draft:\n```json\n{"a":1}\n```\nFinal:\n```json\n{"a":2}\n```')).toBe('{"a":2}');
+    expect(extractJsonObject('Here it is: {"a":{"b":"}"}} done')).toBe('{"a":{"b":"}"}}');
+    expect(extractJsonObject('not json')).toBe('not json');
+    expect(extractJsonObject('[1,2]')).toBe('[1,2]');
+    expect(extractJsonObject('broken {"a": } here')).toBe('broken {"a": } here');
   });
 
   it('relay needs a base URL, and its errors never leak the key', async () => {

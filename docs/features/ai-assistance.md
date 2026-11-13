@@ -21,7 +21,7 @@ AI is **off by default**. Nothing is sent to an AI provider until an administrat
 | Anthropic Claude | Messages API (official Anthropic SDK) | JSON schema (`output_config.format`) |
 | OpenAI | Chat Completions | JSON schema, strict mode |
 | Google Gemini | `generateContent` | JSON schema (`responseJsonSchema`) |
-| Relay | [Relay](https://github.com/nimeshkasun/Relay) gateway, OpenAI-compatible `/v1/chat/completions` | JSON schema, strict mode |
+| Relay | [Relay](https://github.com/nimeshkasun/Relay) gateway, OpenAI-compatible `/v1/chat/completions` | JSON schema, strict mode, and the schema stated in the prompt |
 
 Configure them under **Administration → AI assistance**:
 
@@ -44,6 +44,7 @@ On the public Claude API, requests to `claude-opus-5-5`, `claude-opus-5`, `claud
 - **Model.** A Relay route (`smart`, `cheap`, `resilient`) or a `provider/model` slug from your gateway's `GET /v1/models`. Defaults to `smart`.
 - **Prices.** Relay routes are not in Argus's price list, so enter the per-million-token prices if you want Argus's budget to count Relay requests. Relay's own spend caps apply regardless.
 - Requests are tagged `app:argus` for Relay's reports and bypass Relay's response cache. The answer is labelled with the model Relay reports it used (`x-relay-model`), which can differ from the route you chose.
+- **Answer format.** Not every model behind Relay enforces the JSON schema Argus sends as `response_format`. So for Relay, Argus also states the schema in the prompt, and accepts an answer that wraps its JSON in prose or a code fence. The answer is still validated against the schema, and discarded if it does not match.
 
 Argus's own guardrails (secret redaction, context cap, repository opt-out, schema validation, budget and audit) apply before a request reaches Relay, in addition to any guardrails configured in Relay.
 

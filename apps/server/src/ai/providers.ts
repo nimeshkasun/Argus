@@ -105,6 +105,16 @@ class OpenAiClient implements AiClient {
     return (this.opts.baseUrl ?? AI_DEFAULT_BASE_URLS.openai).replace(/\/+$/, '');
   }
 
+  /** The system message as sent. */
+  protected systemPrompt(req: AiRequest): string {
+    return req.system;
+  }
+
+  /** The answer text handed to the caller. */
+  protected answerText(text: string): string {
+    return text;
+  }
+
   async generate(req: AiRequest): Promise<AiResponse> {
     const base = this.endpoint();
     const res = await withKey(this.opts.apiKey, this.label, () =>
@@ -116,7 +126,7 @@ class OpenAiClient implements AiClient {
         body: JSON.stringify({
           model: this.opts.model,
           messages: [
-            { role: 'system', content: req.system },
+            { role: 'system', content: this.systemPrompt(req) },
             { role: 'user', content: req.prompt },
           ],
           max_completion_tokens: MAX_TOKENS,
@@ -135,7 +145,7 @@ class OpenAiClient implements AiClient {
     if (choice?.finish_reason === 'length') throw new AiOutputError('The answer was cut off at the output token limit.');
     // Relay reports the model that really served the request (after routing or fallback) in a header.
     const served = res.headers.get('x-relay-model');
-    return { text: choice?.message?.content ?? '', model: served || body.model || this.opts.model, inputTokens: body.usage?.prompt_tokens ?? 0, outputTokens: body.usage?.completion_tokens ?? 0 };
+    return { text: this.answerText(choice?.message?.content ?? ''), model: served || body.model || this.opts.model, inputTokens: body.usage?.prompt_tokens ?? 0, outputTokens: body.usage?.completion_tokens ?? 0 };
   }
 }
 
@@ -158,6 +168,41 @@ class RelayClient extends OpenAiClient {
   protected override extraBody(): Record<string, unknown> {
     return { relay: { tags: ['app:argus'], cache: false } };
   }
+
+  // Relay forwards to providers that do not all enforce response_format (a Claude model behind it answers in
+  // prose with its own field names). So the schema is also stated in the prompt, and a JSON object wrapped in
+  // prose or a code fence is accepted. The caller still validates the result against the schema.
+  protected override systemPrompt(req: AiRequest): string {
+    return `${req.system}\n\nAnswer with one JSON object and nothing else: no text before or after it and no code fence. It must match this JSON Schema exactly, with these property names and every property present:\n${JSON.stringify(req.schema)}`;
+  }
+
+  protected override answerText(text: string): string {
+    return extractJsonObject(text);
+  }
+}
+
+/**
+ * The JSON object inside an answer that wraps it in prose or a Markdown code fence. Returns the text unchanged
+ * when it is already JSON or holds no JSON object, so the caller's validation decides.
+ */
+export function extractJsonObject(text: string): string {
+  const isObject = (s: string): boolean => {
+    try {
+      const v: unknown = JSON.parse(s);
+      return typeof v === 'object' && v !== null && !Array.isArray(v);
+    } catch {
+      return false;
+    }
+  };
+  const trimmed = text.trim();
+  if (isObject(trimmed)) return trimmed;
+  // The last fenced block wins: models put the final answer after their explanation.
+  const fenced = [...trimmed.matchAll(/```[a-zA-Z]*\s*\n([\s\S]*?)```/g)].map((m) => m[1].trim()).reverse();
+  for (const block of fenced) if (isObject(block)) return block;
+  const start = trimmed.indexOf('{');
+  const end = trimmed.lastIndexOf('}');
+  if (start >= 0 && end > start && isObject(trimmed.slice(start, end + 1))) return trimmed.slice(start, end + 1);
+  return text;
 }
 
 /** Gemini generateContent with a JSON response schema. */
