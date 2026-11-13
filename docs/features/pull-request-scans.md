@@ -41,6 +41,7 @@ Turn on **Pull request code review** under **Administration → AI**. Argus then
 - **What is reviewed.** The diff of the pull request against the point where its branch left the base branch: the changed regions of each file with three lines of context. Lock files, minified or generated code, build output, binaries and deleted files are left out. Files are added in order until the AI **context limit** is reached; the comment says how many files were not reviewed. Raise the context limit for larger pull requests.
 - **What is sent.** Those diff lines, the pull request title and the titles of the issues the scanners found (so the review does not repeat them). Secrets are redacted first, as in every AI request.
 - **Where it shows.** An **AI code review** section in the same pull request comment: a short summary, then up to 10 remarks, each with a severity (*issue*, *suggestion*, *nitpick*), a category, and a link to the file and line. Remarks that point at a line the diff does not contain are dropped. The same review is shown on the scan in Argus and in the API result as `review`.
+- **Once per pull request, or on every push.** By default the review runs on the first scan of a pull request only. Later pushes are scanned as usual, but they keep that first review, in the summary comment and in the scan result, and post no new remarks. If the first review failed, the next scan tries again. To review every push instead, turn on **Review every push** under the feature's switch (`prReviewEveryPush` in the AI settings).
 - **It is advisory.** The review never changes the gate, opens no tickets and stores no findings. It is labelled with the model that wrote it. If the AI provider fails, or the budget is used up, the scan still completes without a review.
 
 ### Inline comments
@@ -48,11 +49,11 @@ Turn on **Pull request code review** under **Administration → AI**. Argus then
 By default the remarks are listed in the summary comment. Turn on **Post remarks as inline comments** (under the feature's switch) to post each remark on its line of the pull request instead, like a reviewer's comment: on GitHub as a review comment, on Bitbucket Cloud and Data Center as an inline comment that can be replied to and resolved. The summary comment then keeps the overview and says how many remarks were posted inline.
 
 - Each inline comment names its severity and category and is marked as an AI-assisted review posted by Argus.
-- Inline comments from earlier scans are never removed, so a new scan adds its remarks next to them and the same remark can appear more than once on a line.
+- Inline comments from earlier scans are never removed. With **Review every push** on, each new review adds its remarks next to them, so the same remark can appear more than once on a line.
 - A remark that cannot be posted inline (no permission, or the provider does not accept the line) is listed in the summary comment instead.
 - It needs the same permission as the summary comment (see **Let Argus comment** below). Requests made with `"comment": false` post no inline comments either.
 
-It needs one extra fetch of the base branch per scan and one AI request per scan. The usual AI controls apply: the repository's AI opt-out, the monthly budget, and the audit log (`ai.request`, use case `pr_review`).
+It needs one extra fetch of the base branch per scan and one AI request per reviewed scan. The usual AI controls apply: the repository's AI opt-out, the monthly budget, and the audit log (`ai.request`, use case `pr_review`).
 
 ## Setting it up
 

@@ -264,11 +264,20 @@ describe.each(dbHarnesses())('pull request scans from CI e2e: $name', (h) => {
     expect(inline).toEqual([]);
   });
 
-  it('posts the review remarks as inline comments when that is turned on, keeping the previous scan\'s', async () => {
+  it('reviews a pull request once: later pushes keep the first review and post nothing new', async () => {
+    const before = aiCalls.length;
+    const again = await finished((await ci('post', '/api/v1/ci/pull-requests', { repository: 'acme/shop', pullRequest: 7 })).body.id);
+    expect(aiCalls).toHaveLength(before);
+    expect(again.result!.review).toMatchObject({ summary: 'Adds a checkout module and a region setting.', filesReviewed: 2 });
+    expect(comments.at(-1)!.body).toContain('AI code review (1 remark)');
+  });
+
+  it('posts the review remarks as inline comments when that is turned on, and reviews every push when asked to', async () => {
     const current = (await admin.call('get', '/api/v1/settings/ai')).body;
-    const saved = await admin.call('put', '/api/v1/settings/ai', { ...current, prReviewInline: true });
+    expect(current.prReviewEveryPush).toBe(false);
+    const saved = await admin.call('put', '/api/v1/settings/ai', { ...current, prReviewInline: true, prReviewEveryPush: true });
     expect(saved.status).toBe(200);
-    expect(saved.body.prReviewInline).toBe(true);
+    expect(saved.body).toMatchObject({ prReviewInline: true, prReviewEveryPush: true });
 
     const first = await finished((await ci('post', '/api/v1/ci/pull-requests', { repository: 'acme/shop', pullRequest: 7 })).body.id);
     expect(first).toMatchObject({ status: 'succeeded', gate: 'passed' });
@@ -282,10 +291,15 @@ describe.each(dbHarnesses())('pull request scans from CI e2e: $name', (h) => {
     expect(body).toContain('1 remark is posted as inline comment on the changed lines.');
     expect(body).not.toContain('Export a function that reads the token');
 
-    // The next scan posts its own comments and leaves the earlier ones alone.
+    // The next push is reviewed again: its remarks are added, and the earlier comments are left alone.
     const second = await finished((await ci('post', '/api/v1/ci/pull-requests', { repository: 'acme/shop', pullRequest: 7 })).body.id);
-    expect(inline.map((c) => c.method)).toEqual(['POST', 'POST']);
-    expect(second.result!.review!.inlineIds).toHaveLength(1);
-    expect(second.result!.review!.inlineIds).not.toEqual(['9000']);
+    expect(inline.map((c) => [c.method, c.id])).toEqual([['POST', 9000], ['POST', 9001]]);
+    expect(second.result!.review!.inlineIds).toEqual(['9001']);
+
+    // Back to once per pull request: nothing more is posted, and the last review is kept.
+    expect((await admin.call('put', '/api/v1/settings/ai', { ...saved.body, prReviewEveryPush: false })).status).toBe(200);
+    const third = await finished((await ci('post', '/api/v1/ci/pull-requests', { repository: 'acme/shop', pullRequest: 7 })).body.id);
+    expect(inline).toHaveLength(2);
+    expect(third.result!.review!.inlineIds).toEqual(['9001']);
   });
 });

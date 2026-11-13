@@ -244,7 +244,13 @@ export function AiSettingsPage() {
               <div className="min-w-60 flex-1">
                 <Checkbox label={AI_USE_CASE_LABELS[u].label} description={AI_USE_CASE_LABELS[u].description} checked={f.useCases[u].enabled} onChange={(e) => setUseCase(u, { enabled: e.target.checked })} />
                 {u === 'pr_review' && f.useCases.pr_review.enabled && (
-                  <div className="mt-3 pl-7">
+                  <div className="mt-3 space-y-3 pl-7">
+                    <Checkbox
+                      label="Review every push"
+                      description="Review the pull request again each time it is scanned. Off: only the first scan of a pull request is reviewed, and later scans keep that review."
+                      checked={f.prReviewEveryPush}
+                      onChange={(e) => setF({ ...f, prReviewEveryPush: e.target.checked })}
+                    />
                     <Checkbox
                       label="Post remarks as inline comments"
                       description="Each remark is posted on its line of the pull request, like a reviewer's comment, instead of being listed in the summary comment. Comments from earlier scans are left in place."

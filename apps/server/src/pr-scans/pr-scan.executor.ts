@@ -127,8 +127,14 @@ export class PrScanExecutor implements OnModuleInit {
       });
 
       // Optional AI code review of the diff. Advisory: it never changes the gate, and a failure only skips it.
-      let review = null;
-      if (pr.baseBranch && (await reviewEnabled(this.ai, repo))) {
+      // Unless "review every push" is on, it runs once per pull request: later pushes keep the first review (and its
+      // summary section) as it is.
+      const everyPush = (await this.ai.getSettings()).prReviewEveryPush;
+      const earlier = everyPush ? null : ((await this.store.prScans.findLastCommented(scan.repoId, scan.number))?.result?.review ?? null);
+      let review: PrReviewDto | null = null;
+      if (earlier) {
+        log('AI code review skipped: this pull request was already reviewed by an earlier scan');
+      } else if (pr.baseBranch && (await reviewEnabled(this.ai, repo))) {
         const diff = await collectDiff({
           git,
           workdir,
@@ -151,7 +157,7 @@ export class PrScanExecutor implements OnModuleInit {
       }
 
       const result = buildResult(delta, { changedFiles: changed?.length ?? files.length, failOn: scan.failOn, scanners: analysis.results, ai });
-      result.review = review;
+      result.review = review ?? earlier;
       log(`Result: ${delta.introduced.length} new issue(s), gate ${result.gate}; ${delta.existingInChangedFiles} already known in changed files, ${delta.suppressed} suppressed`);
       const patch: PrScanPatch = { status: 'succeeded', headSha, result };
       if (scan.comment && review) await this.inlineComments(scan, repo.fullName, client, headSha, review, log);
