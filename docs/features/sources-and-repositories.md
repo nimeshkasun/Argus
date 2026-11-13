@@ -32,8 +32,22 @@ Argus only reads code, so give it read-only credentials.
 | Provider | Recommended credential | Minimum permissions |
 |---|---|---|
 | GitHub | Fine-grained personal access token (or a token for a dedicated machine user) | Repository access to the repositories to monitor, with **Contents: read** and **Metadata: read**. A classic token needs the `repo` scope. For [pull request scans](pull-request-scans.md) to comment, add **Pull requests: Read and write**. |
-| Bitbucket Cloud | Workspace access token | **Repositories: read** |
+| Bitbucket Cloud | Workspace access token, or an Atlassian API token with scopes (below) | **Repositories: read**. For [pull request scans](pull-request-scans.md), add **Pull requests: write**. |
 | Bitbucket Data Center | HTTP access token (project- or user-level) | **Project read** or **Repository read** |
+
+### Bitbucket Cloud API token scopes
+
+An Atlassian API token is created at **id.atlassian.com → Security → API tokens → Create API token with scopes**, with **Bitbucket** as the app. Enter the account email as the source's **Username**. Argus acts as that account: its pull request comments carry that person's name, so a dedicated account is the better choice.
+
+| Scope | Used for | Needed |
+|---|---|---|
+| `read:repository:bitbucket` | Listing the workspace's repositories and cloning them | Always |
+| `read:workspace:bitbucket` | Reaching the workspace the source names | Recommended |
+| `read:user:bitbucket` | Showing the account name when the connection is tested (otherwise the username is shown) | Optional |
+| `read:pullrequest:bitbucket` | Reading a pull request and its changed files | [Pull request scans](pull-request-scans.md) |
+| `write:pullrequest:bitbucket` | The summary comment, inline comments, and requesting changes | Pull request scans that comment |
+
+Nothing else is needed: Argus never writes to a repository, and it does not create webhooks through the API (no `write:repository`, `admin:*`, `delete:*`, webhook or pipeline scopes). The scopes of an existing token cannot be changed: create a new token, edit the source and paste it.
 
 ### GitHub App (alternative to a personal access token)
 

@@ -60,7 +60,7 @@ Turn on **Request changes when there are remarks** (under the feature's switch, 
 - Only the code review's remarks count. New scanner findings alone (vulnerabilities, secrets, …) never request changes: the gate covers those. A review without remarks does not either.
 - It happens when a review is made. With **Review every push** off, later scans keep the first review and do not request changes again.
 - Argus does not withdraw the request. A person dismisses the review (GitHub) or the author asks for a new review once the remarks are handled. If approvals are required to merge, a standing request blocks the merge until then.
-- It needs the same permission as the summary comment. The provider refuses it when the credentials belong to the pull request's author; on Bitbucket Data Center they must belong to a user (not a project or repository access token). A refusal is recorded in the scan's log and changes nothing else. Requests made with `"comment": false` never request changes.
+- It needs write access to pull requests (see **Let Argus comment** below). On Bitbucket Cloud a token that can only read pull requests may still be able to comment, but requesting changes is refused with a 403 until it has `write:pullrequest:bitbucket`. The provider refuses it when the credentials belong to the pull request's author; on Bitbucket Data Center they must belong to a user (not a project or repository access token). A refusal is recorded in the scan's log and changes nothing else. Requests made with `"comment": false` never request changes.
 
 It needs one extra fetch of the base branch per scan and one AI request per reviewed scan. The usual AI controls apply: the repository's AI opt-out, the monthly budget, and the audit log (`ai.request`, use case `pr_review`).
 
@@ -75,7 +75,8 @@ The source's credentials need to be allowed to comment on pull requests (scannin
 | GitHub, fine-grained token | **Pull requests: Read and write** |
 | GitHub, classic token | `repo` (already required) |
 | GitHub App | Repository permission **Pull requests: Read and write** (accept the updated permissions on the installation) |
-| Bitbucket Cloud access token / API token | **Pull requests: Write** (`pullrequest:write`) |
+| Bitbucket Cloud workspace or repository access token | **Pull requests: Write** (`pullrequest:write`) |
+| Bitbucket Cloud API token with scopes | `read:pullrequest:bitbucket` and `write:pullrequest:bitbucket` (see [the full list](sources-and-repositories.md#bitbucket-cloud-api-token-scopes)) |
 | Bitbucket Data Center | **Repository read** is enough to comment |
 
 Without it, the scan still runs and the pipeline still gets the result; the scan records why the comment could not be posted.
