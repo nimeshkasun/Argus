@@ -175,39 +175,13 @@ export class PrScanExecutor implements OnModuleInit {
   }
 
   /**
-   * With "inline comments" on, posts each remark of the AI code review on its line of the pull request and removes
-   * the ones the previous scan posted. A remark that cannot be posted inline stays in the summary comment. Never
+   * With "inline comments" on, posts each remark of the AI code review on its line of the pull request; comments
+   * from earlier scans are left in place. A remark that cannot be posted inline stays in the summary comment. Never
    * fails the scan.
    */
   private async inlineComments(scan: PrScan, fullName: string, client: ProviderClient, headSha: string, review: PrReviewDto, log: (m: string) => void): Promise<void> {
-    const previous = await this.store.prScans.findLastCommented(scan.repoId, scan.number);
-    const stale = previous?.result?.review?.inlineIds ?? [];
-    const enabled = (await this.ai.getSettings()).prReviewInline;
-    if (!enabled && !stale.length) return;
-
-    // Replace rather than pile up: a new scan reviews the pull request afresh. Comments people replied
-    // to are part of a conversation and stay; if that cannot be checked, nothing is removed.
-    if (stale.length) {
-      let discussed: Set<string> | null = null;
-      try {
-        discussed = await client.discussedInlineComments(fullName, scan.number, stale);
-      } catch (err) {
-        log(`Could not check the previous inline comments for replies (${err instanceof Error ? err.message : String(err)}); they are kept`);
-      }
-      if (discussed) {
-        let removed = 0;
-        for (const id of stale.filter((i) => !discussed.has(i))) {
-          try {
-            await client.deleteInlineComment(fullName, scan.number, id);
-            removed++;
-          } catch {
-            // The provider refused (for example a reply arrived in the meantime): the comment stays.
-          }
-        }
-        log(`Removed ${removed} of ${stale.length} inline comment(s) from the previous scan${discussed.size ? `; ${discussed.size} with replies kept` : ''}`);
-      }
-    }
-    if (!enabled) return;
+    // Comments posted by earlier scans are left in place.
+    if (!(await this.ai.getSettings()).prReviewInline) return;
 
     const ids: string[] = [];
     let failure: string | null = null;

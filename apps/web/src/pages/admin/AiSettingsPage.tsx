@@ -247,7 +247,7 @@ export function AiSettingsPage() {
                   <div className="mt-3 pl-7">
                     <Checkbox
                       label="Post remarks as inline comments"
-                      description="Each remark is posted on its line of the pull request, like a reviewer's comment, instead of being listed in the summary comment. A new scan replaces the previous scan's inline comments."
+                      description="Each remark is posted on its line of the pull request, like a reviewer's comment, instead of being listed in the summary comment. Comments from earlier scans are left in place."
                       checked={f.prReviewInline}
                       onChange={(e) => setF({ ...f, prReviewInline: e.target.checked })}
                     />

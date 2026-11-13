@@ -264,7 +264,7 @@ describe.each(dbHarnesses())('pull request scans from CI e2e: $name', (h) => {
     expect(inline).toEqual([]);
   });
 
-  it('posts the review remarks as inline comments when that is turned on, replacing the previous scan\'s', async () => {
+  it('posts the review remarks as inline comments when that is turned on, keeping the previous scan\'s', async () => {
     const current = (await admin.call('get', '/api/v1/settings/ai')).body;
     const saved = await admin.call('put', '/api/v1/settings/ai', { ...current, prReviewInline: true });
     expect(saved.status).toBe(200);
@@ -282,26 +282,10 @@ describe.each(dbHarnesses())('pull request scans from CI e2e: $name', (h) => {
     expect(body).toContain('1 remark is posted as inline comment on the changed lines.');
     expect(body).not.toContain('Export a function that reads the token');
 
-    // The next scan reviews afresh: it removes the comment it posted before and posts the new one.
+    // The next scan posts its own comments and leaves the earlier ones alone.
     const second = await finished((await ci('post', '/api/v1/ci/pull-requests', { repository: 'acme/shop', pullRequest: 7 })).body.id);
-    expect(inline.map((c) => [c.method, c.id])).toEqual([['POST', 9000], ['DELETE', 9000], ['POST', 9002]]);
-    expect(second.result!.review!.inlineIds).toEqual(['9002']);
-  });
-
-  it('keeps an inline comment that someone replied to, and nothing else', async () => {
-    const scanAgain = async () => finished((await ci('post', '/api/v1/ci/pull-requests', { repository: 'acme/shop', pullRequest: 7 })).body.id);
-    const deleted = () => inline.filter((c) => c.method === 'DELETE').map((c) => c.id);
-
-    // Someone replied to the comment of the previous scan (9002): it stays, and the new remark is posted next to it.
-    reviewThread = [{ id: 9002 }, { id: 5001, in_reply_to_id: 9002 }];
-    const third = await scanAgain();
-    expect(deleted()).toEqual([9000]);
-    expect(third.result!.review!.inlineIds).toEqual(['9003']);
-
-    // A reaction alone does not keep a comment: it is replaced as usual.
-    reviewThread = [{ id: 9003, reactions: { total_count: 1 } }];
-    const fourth = await scanAgain();
-    expect(deleted()).toEqual([9000, 9003]);
-    expect(fourth.result!.review!.inlineIds).toEqual(['9005']);
+    expect(inline.map((c) => c.method)).toEqual(['POST', 'POST']);
+    expect(second.result!.review!.inlineIds).toHaveLength(1);
+    expect(second.result!.review!.inlineIds).not.toEqual(['9000']);
   });
 });
