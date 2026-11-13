@@ -161,6 +161,19 @@ export class BitbucketCloudClient implements ProviderClient {
     return String(data.id);
   }
 
+  async discussedInlineComments(fullName: string, number: number, ids: string[]): Promise<Set<string>> {
+    // Bitbucket Cloud has no reactions on comments; a reply names its parent.
+    const wanted = new Set(ids);
+    const out = new Set<string>();
+    let url: string | undefined = `${this.repoUrl(fullName)}/pullrequests/${number}/comments?pagelen=100`;
+    for (let page = 0; url && page < 50; page++) {
+      const res: { data: CloudPage<{ parent?: { id?: number } | null; deleted?: boolean }> } = await this.get<CloudPage<{ parent?: { id?: number } | null; deleted?: boolean }>>(url);
+      for (const c of res.data.values) if (!c.deleted && c.parent?.id && wanted.has(String(c.parent.id))) out.add(String(c.parent.id));
+      url = res.data.next;
+    }
+    return out;
+  }
+
   async deleteInlineComment(fullName: string, number: number, id: string): Promise<void> {
     if (!/^\d+$/.test(id)) return;
     try {
@@ -322,6 +335,21 @@ export class BitbucketServerClient implements ProviderClient {
     const anchor = { path: c.path, line: c.line, lineType: c.added ? 'ADDED' : 'CONTEXT', fileType: 'TO', diffType: 'EFFECTIVE' };
     const { data } = await this.send<{ id: number }>(`${this.repoUrl(fullName)}/pull-requests/${number}/comments`, 'POST', { text: c.body, anchor });
     return String(data.id);
+  }
+
+  async discussedInlineComments(fullName: string, number: number, ids: string[]): Promise<Set<string>> {
+    const out = new Set<string>();
+    for (const id of ids.filter((i) => /^\d+$/.test(i))) {
+      try {
+        // A comment carries its replies, and its reactions where the server version has them.
+        const { data } = await this.get<{ comments?: unknown[]; reactions?: unknown[]; properties?: { reactions?: unknown[] } }>(`${this.repoUrl(fullName)}/pull-requests/${number}/comments/${id}`);
+        if (data.comments?.length || data.reactions?.length || data.properties?.reactions?.length) out.add(id);
+      } catch (err) {
+        // Already deleted: nothing to keep.
+        if (!(err instanceof ProviderError && err.status === 404)) throw err;
+      }
+    }
+    return out;
   }
 
   async deleteInlineComment(fullName: string, number: number, id: string): Promise<void> {

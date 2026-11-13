@@ -33,6 +33,8 @@ describe.each(dbHarnesses())('pull request scans from CI e2e: $name', (h) => {
   const comments: { method: string; path: string; body: string }[] = [];
   const intelCalls = new Map<string, number>();
   const aiCalls: AiCall[] = [];
+  /** What GitHub lists as the pull request's review comments: Argus's own, plus people's replies. */
+  let reviewThread: { id: number; in_reply_to_id?: number; reactions?: { total_count: number } }[] = [];
   /** Inline review comments created and deleted on the pull request. */
   const inline: { method: string; id: number; body: Record<string, unknown> }[] = [];
 
@@ -73,6 +75,7 @@ describe.each(dbHarnesses())('pull request scans from CI e2e: $name', (h) => {
       comments.push({ method: 'PATCH', path: p, body: (JSON.parse(body) as { body: string }).body });
       return json({ id: 4242, html_url: `${mock.baseUrl}/acme/shop/pull/7#issuecomment-4242` });
     }
+    if (req.method === 'GET' && p === '/api/v3/repos/acme/shop/pulls/7/comments') return json(reviewThread);
     if (req.method === 'POST' && p === '/api/v3/repos/acme/shop/pulls/7/comments') {
       const id = 9000 + inline.length;
       inline.push({ method: 'POST', id, body: JSON.parse(body) as Record<string, unknown> });
@@ -283,5 +286,27 @@ describe.each(dbHarnesses())('pull request scans from CI e2e: $name', (h) => {
     const second = await finished((await ci('post', '/api/v1/ci/pull-requests', { repository: 'acme/shop', pullRequest: 7 })).body.id);
     expect(inline.map((c) => [c.method, c.id])).toEqual([['POST', 9000], ['DELETE', 9000], ['POST', 9002]]);
     expect(second.result!.review!.inlineIds).toEqual(['9002']);
+  });
+
+  it('keeps an inline comment that someone replied or reacted to', async () => {
+    const scanAgain = async () => finished((await ci('post', '/api/v1/ci/pull-requests', { repository: 'acme/shop', pullRequest: 7 })).body.id);
+    const deleted = () => inline.filter((c) => c.method === 'DELETE').map((c) => c.id);
+
+    // Someone replied to the comment of the previous scan (9002): it stays, and the new remark is posted next to it.
+    reviewThread = [{ id: 9002 }, { id: 5001, in_reply_to_id: 9002 }];
+    const third = await scanAgain();
+    expect(deleted()).toEqual([9000]);
+    expect(third.result!.review!.inlineIds).toEqual(['9003']);
+
+    // A reaction counts as well.
+    reviewThread = [{ id: 9003, reactions: { total_count: 1 } }];
+    const fourth = await scanAgain();
+    expect(deleted()).toEqual([9000]);
+    expect(fourth.result!.review!.inlineIds).toEqual(['9004']);
+
+    // Nobody engaged with the last one: it is replaced as usual.
+    reviewThread = [{ id: 9004, reactions: { total_count: 0 } }];
+    await scanAgain();
+    expect(deleted()).toEqual([9000, 9004]);
   });
 });

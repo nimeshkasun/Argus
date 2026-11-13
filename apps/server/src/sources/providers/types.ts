@@ -66,6 +66,11 @@ export interface ProviderClient {
   upsertPullRequestComment(fullName: string, number: number, body: string, existing: string | null): Promise<PullRequestComment>;
   /** Posts a comment on a line of the pull request's diff and returns its id. */
   createInlineComment(fullName: string, number: number, comment: InlineCommentInput): Promise<string>;
+  /**
+   * Which of these inline comments people have engaged with: replied to or, where the provider has them, reacted to.
+   * Those are part of a conversation and are not removed when a new scan replaces the earlier comments.
+   */
+  discussedInlineComments(fullName: string, number: number, ids: string[]): Promise<Set<string>>;
   /** Removes an inline comment Argus posted earlier. Missing comments are not an error. */
   deleteInlineComment(fullName: string, number: number, id: string): Promise<void>;
 }

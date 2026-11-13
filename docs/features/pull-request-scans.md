@@ -48,7 +48,7 @@ Turn on **Pull request code review** under **Administration → AI**. Argus then
 By default the remarks are listed in the summary comment. Turn on **Post remarks as inline comments** (under the feature's switch) to post each remark on its line of the pull request instead, like a reviewer's comment: on GitHub as a review comment, on Bitbucket Cloud and Data Center as an inline comment that can be replied to and resolved. The summary comment then keeps the overview and says how many remarks were posted inline.
 
 - Each inline comment names its severity and category and is marked as an AI-assisted review posted by Argus.
-- A new scan reviews the pull request afresh: it removes the inline comments the previous scan posted, then posts the new ones. A comment the provider refuses to delete (for example one with replies on Bitbucket Data Center) stays.
+- A new scan reviews the pull request afresh: it removes the inline comments the previous scan posted, then posts the new ones. A comment that someone **replied to** stays, so a conversation is never deleted; so does one that someone **reacted to** on GitHub (and on Bitbucket Data Center versions that report reactions; Bitbucket Cloud has no reactions on comments). If Argus cannot check for replies, it removes nothing. A kept comment and a new remark can then sit on the same line.
 - A remark that cannot be posted inline (no permission, or the provider does not accept the line) is listed in the summary comment instead.
 - It needs the same permission as the summary comment (see **Let Argus comment** below). Requests made with `"comment": false` post no inline comments either.
 

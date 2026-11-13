@@ -246,6 +246,23 @@ export class GitHubClient implements ProviderClient {
     return String(data.id);
   }
 
+  async discussedInlineComments(fullName: string, number: number, ids: string[]): Promise<Set<string>> {
+    type GhReviewComment = { id: number; in_reply_to_id?: number | null; reactions?: { total_count?: number } };
+    const wanted = new Set(ids);
+    const out = new Set<string>();
+    let url: string | null = this.url(`${this.repoPath(fullName)}/pulls/${number}/comments?per_page=100`);
+    for (let page = 0; url && page < 50; page++) {
+      const res: { data: GhReviewComment[]; headers: Headers } = await this.get<GhReviewComment[]>(url);
+      for (const c of res.data) {
+        // A reply names the comment that started its thread.
+        if (c.in_reply_to_id && wanted.has(String(c.in_reply_to_id))) out.add(String(c.in_reply_to_id));
+        if (wanted.has(String(c.id)) && (c.reactions?.total_count ?? 0) > 0) out.add(String(c.id));
+      }
+      url = nextLink(res.headers.get('link'));
+    }
+    return out;
+  }
+
   async deleteInlineComment(fullName: string, _number: number, id: string): Promise<void> {
     if (!/^\d+$/.test(id)) return;
     try {

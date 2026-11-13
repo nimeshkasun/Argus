@@ -185,17 +185,28 @@ export class PrScanExecutor implements OnModuleInit {
     const enabled = (await this.ai.getSettings()).prReviewInline;
     if (!enabled && !stale.length) return;
 
-    // Replace rather than pile up: a new scan reviews the pull request afresh.
-    let removed = 0;
-    for (const id of stale) {
+    // Replace rather than pile up: a new scan reviews the pull request afresh. Comments people replied or reacted
+    // to are part of a conversation and stay; if that cannot be checked, nothing is removed.
+    if (stale.length) {
+      let discussed: Set<string> | null = null;
       try {
-        await client.deleteInlineComment(fullName, scan.number, id);
-        removed++;
-      } catch {
-        // For example a comment someone replied to, which the provider keeps.
+        discussed = await client.discussedInlineComments(fullName, scan.number, stale);
+      } catch (err) {
+        log(`Could not check the previous inline comments for replies (${err instanceof Error ? err.message : String(err)}); they are kept`);
+      }
+      if (discussed) {
+        let removed = 0;
+        for (const id of stale.filter((i) => !discussed.has(i))) {
+          try {
+            await client.deleteInlineComment(fullName, scan.number, id);
+            removed++;
+          } catch {
+            // The provider refused (for example a reply arrived in the meantime): the comment stays.
+          }
+        }
+        log(`Removed ${removed} of ${stale.length} inline comment(s) from the previous scan${discussed.size ? `; ${discussed.size} with replies or reactions kept` : ''}`);
       }
     }
-    if (stale.length) log(`Removed ${removed} of ${stale.length} inline comment(s) from the previous scan`);
     if (!enabled) return;
 
     const ids: string[] = [];
