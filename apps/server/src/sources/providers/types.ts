@@ -67,8 +67,8 @@ export interface ProviderClient {
   /** Posts a comment on a line of the pull request's diff and returns its id. */
   createInlineComment(fullName: string, number: number, comment: InlineCommentInput): Promise<string>;
   /**
-   * Which of these inline comments people have engaged with: replied to or, where the provider has them, reacted to.
-   * Those are part of a conversation and are not removed when a new scan replaces the earlier comments.
+   * Which of these inline comments someone has replied to. Those are part of a conversation and are not removed
+   * when a new scan replaces the earlier comments. Reactions alone do not keep a comment.
    */
   discussedInlineComments(fullName: string, number: number, ids: string[]): Promise<Set<string>>;
   /** Removes an inline comment Argus posted earlier. Missing comments are not an error. */

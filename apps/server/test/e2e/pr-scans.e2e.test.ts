@@ -288,7 +288,7 @@ describe.each(dbHarnesses())('pull request scans from CI e2e: $name', (h) => {
     expect(second.result!.review!.inlineIds).toEqual(['9002']);
   });
 
-  it('keeps an inline comment that someone replied or reacted to', async () => {
+  it('keeps an inline comment that someone replied to, and nothing else', async () => {
     const scanAgain = async () => finished((await ci('post', '/api/v1/ci/pull-requests', { repository: 'acme/shop', pullRequest: 7 })).body.id);
     const deleted = () => inline.filter((c) => c.method === 'DELETE').map((c) => c.id);
 
@@ -298,15 +298,10 @@ describe.each(dbHarnesses())('pull request scans from CI e2e: $name', (h) => {
     expect(deleted()).toEqual([9000]);
     expect(third.result!.review!.inlineIds).toEqual(['9003']);
 
-    // A reaction counts as well.
+    // A reaction alone does not keep a comment: it is replaced as usual.
     reviewThread = [{ id: 9003, reactions: { total_count: 1 } }];
     const fourth = await scanAgain();
-    expect(deleted()).toEqual([9000]);
-    expect(fourth.result!.review!.inlineIds).toEqual(['9004']);
-
-    // Nobody engaged with the last one: it is replaced as usual.
-    reviewThread = [{ id: 9004, reactions: { total_count: 0 } }];
-    await scanAgain();
-    expect(deleted()).toEqual([9000, 9004]);
+    expect(deleted()).toEqual([9000, 9003]);
+    expect(fourth.result!.review!.inlineIds).toEqual(['9005']);
   });
 });

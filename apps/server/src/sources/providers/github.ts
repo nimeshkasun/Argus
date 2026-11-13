@@ -247,7 +247,7 @@ export class GitHubClient implements ProviderClient {
   }
 
   async discussedInlineComments(fullName: string, number: number, ids: string[]): Promise<Set<string>> {
-    type GhReviewComment = { id: number; in_reply_to_id?: number | null; reactions?: { total_count?: number } };
+    type GhReviewComment = { id: number; in_reply_to_id?: number | null };
     const wanted = new Set(ids);
     const out = new Set<string>();
     let url: string | null = this.url(`${this.repoPath(fullName)}/pulls/${number}/comments?per_page=100`);
@@ -255,9 +255,7 @@ export class GitHubClient implements ProviderClient {
       const res: { data: GhReviewComment[]; headers: Headers } = await this.get<GhReviewComment[]>(url);
       for (const c of res.data) {
         // A reply names the comment that started its thread.
-        if (c.in_reply_to_id && wanted.has(String(c.in_reply_to_id))) out.add(String(c.in_reply_to_id));
-        if (wanted.has(String(c.id)) && (c.reactions?.total_count ?? 0) > 0) out.add(String(c.id));
-      }
+        if (c.in_reply_to_id && wanted.has(String(c.in_reply_to_id))) out.add(String(c.in_reply_to_id));      }
       url = nextLink(res.headers.get('link'));
     }
     return out;

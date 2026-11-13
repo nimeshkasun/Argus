@@ -185,7 +185,7 @@ export class PrScanExecutor implements OnModuleInit {
     const enabled = (await this.ai.getSettings()).prReviewInline;
     if (!enabled && !stale.length) return;
 
-    // Replace rather than pile up: a new scan reviews the pull request afresh. Comments people replied or reacted
+    // Replace rather than pile up: a new scan reviews the pull request afresh. Comments people replied
     // to are part of a conversation and stay; if that cannot be checked, nothing is removed.
     if (stale.length) {
       let discussed: Set<string> | null = null;
@@ -204,7 +204,7 @@ export class PrScanExecutor implements OnModuleInit {
             // The provider refused (for example a reply arrived in the meantime): the comment stays.
           }
         }
-        log(`Removed ${removed} of ${stale.length} inline comment(s) from the previous scan${discussed.size ? `; ${discussed.size} with replies or reactions kept` : ''}`);
+        log(`Removed ${removed} of ${stale.length} inline comment(s) from the previous scan${discussed.size ? `; ${discussed.size} with replies kept` : ''}`);
       }
     }
     if (!enabled) return;

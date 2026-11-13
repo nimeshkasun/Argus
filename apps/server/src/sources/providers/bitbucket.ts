@@ -162,7 +162,7 @@ export class BitbucketCloudClient implements ProviderClient {
   }
 
   async discussedInlineComments(fullName: string, number: number, ids: string[]): Promise<Set<string>> {
-    // Bitbucket Cloud has no reactions on comments; a reply names its parent.
+    // A reply names its parent.
     const wanted = new Set(ids);
     const out = new Set<string>();
     let url: string | undefined = `${this.repoUrl(fullName)}/pullrequests/${number}/comments?pagelen=100`;
@@ -341,9 +341,9 @@ export class BitbucketServerClient implements ProviderClient {
     const out = new Set<string>();
     for (const id of ids.filter((i) => /^\d+$/.test(i))) {
       try {
-        // A comment carries its replies, and its reactions where the server version has them.
-        const { data } = await this.get<{ comments?: unknown[]; reactions?: unknown[]; properties?: { reactions?: unknown[] } }>(`${this.repoUrl(fullName)}/pull-requests/${number}/comments/${id}`);
-        if (data.comments?.length || data.reactions?.length || data.properties?.reactions?.length) out.add(id);
+        // A comment carries its replies.
+        const { data } = await this.get<{ comments?: unknown[] }>(`${this.repoUrl(fullName)}/pull-requests/${number}/comments/${id}`);
+        if (data.comments?.length) out.add(id);
       } catch (err) {
         // Already deleted: nothing to keep.
         if (!(err instanceof ProviderError && err.status === 404)) throw err;
