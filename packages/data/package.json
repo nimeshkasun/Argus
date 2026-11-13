@@ -1,6 +1,6 @@
 {
   "name": "@argus/data",
-  "version": "0.4.3",
+  "version": "0.4.4",
   "private": true,
   "license": "Apache-2.0",
   "main": "dist/index.js",
@@ -10,7 +10,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@argus/shared": "0.4.3",
+    "@argus/shared": "0.4.4",
     "kysely": "^0.28.17",
     "mongodb": "^6.18.0",
     "pg": "^8.16.0"
